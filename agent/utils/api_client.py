@@ -120,10 +120,11 @@ class BackendAPIClient:
                 data = await response.json()
                 if response.status == 200 and data.get('success'):
                     print(f"✅ [API_CLIENT] Tool '{tool_name}' executed successfully")
-                    return data
                 else:
                     error = data.get('error', 'Unknown error')
-                    error_msg = f"Tool '{tool_name}' error: {error}"
-                    print(f"❌ [API_CLIENT] {error_msg}")
-                    raise Exception(error_msg)
+                    print(f"❌ [API_CLIENT] Tool '{tool_name}' returned failure: {error}")
+                # Return the full parsed body on both success and failure so
+                # fields like data.alternatives survive for the caller to use -
+                # raising here would discard them.
+                return data
 

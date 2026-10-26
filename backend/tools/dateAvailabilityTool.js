@@ -1,7 +1,10 @@
 /**
  * Date/time availability checking tool
  */
-const Booking = require("../models/Booking");
+const {
+  getBookingsForDate,
+  findNearestAvailableSlots,
+} = require("../utils/slotFinder");
 
 /**
  * Check if a date/time slot is available
@@ -40,25 +43,36 @@ const execute = async (params) => {
       throw new Error(error);
     }
 
-    const query = {
-      bookingDate: new Date(date),
-      status: { $ne: "cancelled" }, // Don't count cancelled bookings
-    };
+    console.log(
+      `🔍 [AVAILABILITY_TOOL] Checking existing bookings for date:`,
+      date
+    );
+    // Fetch the full day's bookings so alternatives (below) know about every
+    // taken slot, not just the one exact time being checked.
+    const allBookingsForDate = await getBookingsForDate(date);
+
+    let existingBookingsCount;
+    let isAvailable;
+    let alternatives = [];
 
     if (time) {
-      query.bookingTime = time;
+      existingBookingsCount = allBookingsForDate.filter(
+        (b) => b.bookingTime === time
+      ).length;
+      isAvailable = existingBookingsCount === 0;
+      if (!isAvailable) {
+        alternatives = findNearestAvailableSlots(
+          time,
+          allBookingsForDate.map((b) => b.bookingTime)
+        );
+      }
+    } else {
+      existingBookingsCount = allBookingsForDate.length;
+      isAvailable = existingBookingsCount === 0;
     }
 
     console.log(
-      `🔍 [AVAILABILITY_TOOL] Checking for existing bookings with query:`,
-      JSON.stringify(query, null, 2)
-    );
-    const existingBookings = await Booking.find(query);
-
-    const isAvailable = existingBookings.length === 0;
-
-    console.log(
-      `✅ [AVAILABILITY_TOOL] Found ${existingBookings.length} existing booking(s). Available: ${isAvailable}`
+      `✅ [AVAILABILITY_TOOL] Found ${existingBookingsCount} existing booking(s). Available: ${isAvailable}`
     );
 
     return {
@@ -67,7 +81,8 @@ const execute = async (params) => {
         available: isAvailable,
         date,
         time: time || null,
-        existingBookings: existingBookings.length,
+        existingBookings: existingBookingsCount,
+        alternatives,
       },
     };
   } catch (error) {

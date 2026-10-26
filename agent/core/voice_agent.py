@@ -63,13 +63,15 @@ class VoiceAgent(Agent):
         time: Optional[str] = None
     ) -> Dict[str, Any]:
         """Check if a date/time slot is available for booking.
-        
+
         Args:
             date: Date in YYYY-MM-DD format (e.g., "2024-01-15")
             time: Optional time in HH:mm format (24-hour, e.g., "19:00" for 7 PM)
-        
+
         Returns:
-            Availability status with available boolean and existing bookings count
+            Availability status with `available` boolean and existing bookings count.
+            When the slot is taken, includes an `alternatives` array of up to 3 real
+            nearby available HH:mm times - offer these instead of guessing.
         """
         print(f"🔧 [AGENT_TOOL] check_availability called with date={date}, time={time}")
         params = {'date': date}
@@ -113,7 +115,9 @@ class VoiceAgent(Agent):
             customerContact: Optional customer contact number
         
         Returns:
-            Created booking data including booking ID
+            Created booking data including booking ID. On failure due to a conflicting
+            slot, includes an `alternatives` array of up to 3 real nearby available
+            HH:mm times - offer these instead of guessing.
         """
         print(f"🔧 [AGENT_TOOL] create_booking called with guests={numberOfGuests}, date={bookingDate}, time={bookingTime}")
         params = {
@@ -143,8 +147,12 @@ class VoiceAgent(Agent):
             return booking_data
         else:
             error = result.get('error', 'Unknown error')
+            error_data = result.get('data', {}) or {}
             print(f"❌ [AGENT_TOOL] create_booking failed: {error}")
-            return {'error': error}
+            response = {'error': error}
+            if error_data.get('alternatives'):
+                response['alternatives'] = error_data['alternatives']
+            return response
     
     @function_tool()
     async def check_date(

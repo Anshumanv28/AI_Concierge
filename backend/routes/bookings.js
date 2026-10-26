@@ -2,6 +2,11 @@ const express = require("express");
 const router = express.Router();
 const Booking = require("../models/Booking");
 const { sendBookingConfirmation } = require("../services/emailService");
+const {
+  getBookingsForDate,
+  isTimeTaken,
+  findNearestAvailableSlots,
+} = require("../utils/slotFinder");
 
 /**
  * POST /api/bookings
@@ -54,16 +59,19 @@ router.post("/", async (req, res) => {
       }
     }
 
-    // Inline duplicate check - exact date + time match only
-    const existing = await Booking.findOne({
-      bookingDate: new Date(bookingDate),
-      bookingTime: bookingTime,
-    });
+    // Shared conflict check (also excludes cancelled bookings, unlike the
+    // previous inline query here which didn't filter on status)
+    const bookingsForDate = await getBookingsForDate(bookingDate);
 
-    if (existing) {
+    if (isTimeTaken(bookingsForDate, bookingTime)) {
+      const alternatives = findNearestAvailableSlots(
+        bookingTime,
+        bookingsForDate.map((b) => b.bookingTime)
+      );
       return res.status(409).json({
         success: false,
         error: "That exact time slot is already booked",
+        data: { alternatives },
       });
     }
 
@@ -138,6 +146,93 @@ router.get("/", async (req, res) => {
 });
 
 /**
+ * GET /api/bookings/availability
+ * Check if date/time slot is available
+ * Query params: date (YYYY-MM-DD), time (HH:mm, optional)
+ *
+ * Registered before /:id - Express matches routes in order, and a literal
+ * segment like "availability" would otherwise be swallowed by the /:id param.
+ */
+router.get("/availability", async (req, res) => {
+  const startTime = Date.now();
+  console.log(`🌐 [BACKEND] GET /api/bookings/availability`);
+  console.log(`📦 [BACKEND] Query params:`, JSON.stringify(req.query, null, 2));
+
+  try {
+    const { date, time } = req.query;
+
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        error: "Date parameter is required (YYYY-MM-DD format)",
+      });
+    }
+
+    // Validate date format
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid date format. Use YYYY-MM-DD",
+      });
+    }
+
+    // Validate time format if provided
+    if (time && !/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/.test(time)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid time format. Use 24-hour format (HH:mm)",
+      });
+    }
+
+    const allBookingsForDate = await getBookingsForDate(date);
+
+    let existingBookingsCount;
+    let isAvailable;
+    let alternatives = [];
+
+    if (time) {
+      existingBookingsCount = allBookingsForDate.filter(
+        (b) => b.bookingTime === time
+      ).length;
+      isAvailable = existingBookingsCount === 0;
+      if (!isAvailable) {
+        alternatives = findNearestAvailableSlots(
+          time,
+          allBookingsForDate.map((b) => b.bookingTime)
+        );
+      }
+    } else {
+      existingBookingsCount = allBookingsForDate.length;
+      isAvailable = existingBookingsCount === 0;
+    }
+
+    const duration = Date.now() - startTime;
+
+    console.log(`✅ [BACKEND] Availability check completed in ${duration}ms`);
+    console.log(
+      `📊 [BACKEND] Result: ${isAvailable ? "AVAILABLE" : "NOT AVAILABLE"} (${existingBookingsCount} existing booking(s))`
+    );
+
+    res.json({
+      success: true,
+      data: {
+        available: isAvailable,
+        date,
+        time: time || null,
+        existingBookings: existingBookingsCount,
+        alternatives,
+      },
+    });
+  } catch (error) {
+    console.error("Availability check error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to check availability",
+    });
+  }
+});
+
+/**
  * GET /api/bookings/:id
  * Get a specific booking by ID
  */
@@ -194,81 +289,6 @@ router.delete("/:id", async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || "Failed to cancel booking",
-    });
-  }
-});
-
-/**
- * GET /api/bookings/availability
- * Check if date/time slot is available
- * Query params: date (YYYY-MM-DD), time (HH:mm, optional)
- */
-router.get("/availability", async (req, res) => {
-  const startTime = Date.now();
-  console.log(`🌐 [BACKEND] GET /api/bookings/availability`);
-  console.log(`📦 [BACKEND] Query params:`, JSON.stringify(req.query, null, 2));
-
-  try {
-    const { date, time } = req.query;
-
-    if (!date) {
-      return res.status(400).json({
-        success: false,
-        error: "Date parameter is required (YYYY-MM-DD format)",
-      });
-    }
-
-    // Validate date format
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid date format. Use YYYY-MM-DD",
-      });
-    }
-
-    // Validate time format if provided
-    if (time && !/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/.test(time)) {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid time format. Use 24-hour format (HH:mm)",
-      });
-    }
-
-    const query = {
-      bookingDate: new Date(date),
-      status: { $ne: "cancelled" }, // Don't count cancelled bookings
-    };
-
-    if (time) {
-      query.bookingTime = time;
-    }
-
-    const existingBookings = await Booking.find(query);
-
-    const isAvailable = existingBookings.length === 0;
-    const duration = Date.now() - startTime;
-
-    console.log(`✅ [BACKEND] Availability check completed in ${duration}ms`);
-    console.log(
-      `📊 [BACKEND] Result: ${isAvailable ? "AVAILABLE" : "NOT AVAILABLE"} (${
-        existingBookings.length
-      } existing booking(s))`
-    );
-
-    res.json({
-      success: true,
-      data: {
-        available: isAvailable,
-        date,
-        time: time || null,
-        existingBookings: existingBookings.length,
-      },
-    });
-  } catch (error) {
-    console.error("Availability check error:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message || "Failed to check availability",
     });
   }
 });

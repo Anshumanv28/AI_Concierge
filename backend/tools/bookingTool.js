@@ -3,6 +3,11 @@
  */
 const Booking = require("../models/Booking");
 const { sendBookingConfirmation } = require("../services/emailService");
+const {
+  getBookingsForDate,
+  isTimeTaken,
+  findNearestAvailableSlots,
+} = require("../utils/slotFinder");
 
 /**
  * Create a new booking
@@ -65,17 +70,19 @@ const execute = async (params) => {
     console.log(
       `🔍 [BOOKING_TOOL] Checking for existing bookings on ${bookingDate} at ${bookingTime}`
     );
-    const existing = await Booking.findOne({
-      bookingDate: new Date(bookingDate),
-      bookingTime: bookingTime,
-      status: { $ne: "cancelled" },
-    });
+    const bookingsForDate = await getBookingsForDate(bookingDate);
 
-    if (existing) {
-      console.error(
-        `❌ [BOOKING_TOOL] Time slot already booked. Existing booking ID: ${existing._id}`
+    if (isTimeTaken(bookingsForDate, bookingTime)) {
+      const alternatives = findNearestAvailableSlots(
+        bookingTime,
+        bookingsForDate.map((b) => b.bookingTime)
       );
-      throw new Error("That exact time slot is already booked");
+      console.error(`❌ [BOOKING_TOOL] Time slot already booked`);
+      return {
+        success: false,
+        error: "That exact time slot is already booked",
+        data: { alternatives },
+      };
     }
 
     // Create booking
