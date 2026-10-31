@@ -4,7 +4,11 @@ FROM node:18-alpine AS build
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+# npm ci intentionally not used here: this lockfile has optional peer deps
+# (e.g. yaml/typescript, pulled in by react-scripts' toolchain, unused by
+# this plain-JS app) that drift between resolver runs and make npm ci
+# fail non-deterministically even with matching Node/npm versions.
+RUN npm install
 
 COPY . .
 

@@ -91,6 +91,44 @@ LiveKit recording/session path) — `.gitignore` was tightened afterward to stop
 Newest entries at the top. Format: `### YYYY-MM-DD — short title` then a few bullet lines on
 what changed/was decided/was discovered and why it matters for future work.
 
+### 2026-10-31 — First real CI run failed; frontend's `npm ci` is unreliable, switched to `npm install`
+- Pushed the two commits above, checked the resulting GitHub Actions run (`gh run view`). Backend and
+  Agent jobs passed; **Frontend job failed** on `npm ci` with the exact same "Missing: yaml@2.9.1
+  from lock file" `EUSAGE` error documented as already-fixed two entries below. Docker job never ran
+  (depends on all three `needs:` jobs passing).
+- **Root cause of the regression**: after fixing the lockfile once (regenerating inside
+  `node:18-alpine` to match npm 10.8.2), I later ran plain `npm install` directly on the Windows host
+  (npm v11.12.1) a couple of times to reinstall `node_modules` for local native dev/testing. Even with
+  `package.json` unchanged, `npm install` on a different major npm version silently rewrote
+  `package-lock.json` into a shape only self-consistent for npm v11 — re-breaking it for npm
+  10.8.2's `npm ci`, which is exactly what both the Dockerfile and CI use. **Lesson**: once a lockfile
+  has been pinned to match a specific Docker/CI npm version, never run plain `npm install` against it
+  from a different npm version, even "just for local dev" — use `npm ci` locally too (it never
+  rewrites the lockfile) or regenerate+reverify in the matching container every time.
+- **Then discovered the deeper problem**: even regenerating correctly, cleanly, in an isolated
+  `node:18-alpine` container with the *exact* Node/npm versions GitHub Actions itself resolves
+  (confirmed identical: v18.20.8, npm 10.8.2, via `gh run view --log`) **still produced a lockfile
+  that failed `npm ci` on a second independent clean-container verification** — first with a
+  different `yaml` patch (1.10.3 vs the earlier 1.10.2), then with `Invalid: lock file's
+  typescript@7.0.2 does not satisfy typescript@4.9.5`. Neither `yaml` nor `typescript` is an actual
+  dependency of this app (no `.ts` files, no YAML configs) — both are optional peer dependencies
+  several layers deep in `react-scripts@5.0.1`'s (2022-era, now-deprecated) toolchain, and their
+  exact resolved version depends on npm registry state *at resolution time*, not just the Node/npm
+  version — i.e. genuinely non-reproducible across separate `npm install` runs, not something fixable
+  by pinning versions harder.
+- **Fix**: stopped trying to make `npm ci` work for the frontend specifically. Changed both
+  `frontend/Dockerfile` and `.github/workflows/ci.yml`'s frontend job from `npm ci` to plain
+  `npm install`, which tolerates this class of drift instead of hard-failing on it. Verified clean in
+  an isolated container (fresh `npm install` + `CI=true npx react-scripts build`, both from scratch)
+  and with a full `docker build` of the real `frontend/Dockerfile`. **Backend's `npm ci` is untouched
+  and still used** — its dependency tree is small and clean with no such optional-peer instability,
+  and it already passed in the real CI run.
+- Did not touch `frontend/package-lock.json` again this round — with `npm install` in place of
+  `npm ci`, the committed lockfile is now advisory/best-effort rather than strictly authoritative, so
+  there's no more "one correct snapshot" to chase for this particular dependency tree.
+- **Next step**: push this fix and re-check the Actions run to confirm the frontend job (and the
+  previously-never-reached Docker build+push job) actually go green.
+
 ### 2026-10-31 — Fixed both previously-documented "Known Issues": typed chat now works, booking card renders
 - User asked to fix the two gaps noted in the entry below ("Containerized the app...") right after
   they were documented. Both are now fixed and **verified with a real, complete, text-driven
