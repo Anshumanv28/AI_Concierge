@@ -1,6 +1,14 @@
 # Restaurant Voice Booking Agent
 
+[![CI/CD](https://github.com/Anshumanv28/AI_Concierge/actions/workflows/ci.yml/badge.svg)](https://github.com/Anshumanv28/AI_Concierge/actions/workflows/ci.yml)
+
 A full-stack MERN voice-enabled restaurant booking agent that allows customers to book tables through natural voice conversation. Built with LiveKit for voice interaction, OpenAI GPT for NLP, OpenWeatherMap for weather data, and NodeMailer for email confirmations.
+
+## Screenshots
+
+| Landing screen | Live voice session | Booking confirmation |
+| --- | --- | --- |
+| ![Landing screen](docs/screenshots/landing.jpg) | ![Connected voice session](docs/screenshots/connected.jpg) | ![Booking confirmation](docs/screenshots/booking-confirmation.jpg) |
 
 ## Features
 
@@ -218,6 +226,28 @@ cd frontend && npm start
 
 Frontend runs on `http://localhost:3000`
 
+### Run with Docker Compose
+
+The whole stack (MongoDB + backend + agent + frontend) can also run in containers. You still need
+`backend/.env`, `agent/.env` and `frontend/.env` populated first (see above) — the images don't
+bundle any secrets.
+
+```bash
+docker compose --env-file frontend/.env up --build
+```
+
+Notes:
+
+- `--env-file frontend/.env` is required because `REACT_APP_LIVEKIT_URL` and `REACT_APP_BACKEND_URL`
+  get baked into the frontend bundle at build time, so Compose needs them for variable substitution
+  (not just as runtime env vars).
+- The `backend` and `agent` containers get `MONGODB_URI`/`BACKEND_URL` overridden to point at the
+  `mongodb`/`backend` service names on the Compose network — everything else comes from your `.env`
+  files unchanged.
+- If you already have MongoDB running locally on port 27017 (as in local dev), either stop it first
+  or remove the `mongodb` service's `ports` mapping in `docker-compose.yml`.
+- Backend: `http://localhost:5000`, Frontend: `http://localhost:3000`.
+
 ## API Endpoints
 
 ### Bookings
@@ -336,6 +366,17 @@ curl -X POST http://localhost:5000/api/bookings \
 - Customer name/email are captured from the conversation; "Guest"/no-email is only a fallback if the customer declines
 - Bookings are auto-confirmed on successful creation (status: "confirmed") - there's still no restaurant-approval step
 - Weather data fetched fresh for each booking (no caching)
+
+## CI/CD
+
+`.github/workflows/ci.yml` runs on every push and pull request to `main`:
+
+- **backend** / **frontend** / **agent** jobs install dependencies and validate each service builds
+  (the frontend job runs a full `react-scripts build`, which includes ESLint).
+- A **docker** job builds all three images (`backend/Dockerfile`, `agent/Dockerfile`,
+  `frontend/Dockerfile`) to confirm they're buildable, and on merges to `main` additionally pushes
+  them to GitHub Container Registry as `ghcr.io/<owner>/<repo>-{backend,agent,frontend}`, tagged
+  `latest` and with the commit SHA.
 
 ## Future Enhancements
 

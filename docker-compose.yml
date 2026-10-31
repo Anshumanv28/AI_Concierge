@@ -1,0 +1,64 @@
+# Local container stack for the Restaurant Voice Booking Agent.
+#
+# Requires backend/.env, agent/.env and frontend/.env to already exist
+# (see README.md "Environment Variables"). The two REACT_APP_* values are
+# baked into the frontend bundle at build time, so they're read from
+# frontend/.env via --env-file:
+#
+#   docker compose --env-file frontend/.env up --build
+#
+version: "3.9"
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: ai-concierge-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  backend:
+    build: ./backend
+    container_name: ai-concierge-backend
+    restart: unless-stopped
+    env_file: ./backend/.env
+    environment:
+      # Overrides the host-local value in backend/.env so the backend talks
+      # to the mongodb service on the compose network instead of localhost.
+      MONGODB_URI: mongodb://mongodb:27017/restaurant-bookings
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mongodb
+
+  agent:
+    build: ./agent
+    container_name: ai-concierge-agent
+    restart: unless-stopped
+    env_file: ./agent/.env
+    environment:
+      # Overrides the host-local value in agent/.env so the agent reaches
+      # the backend service on the compose network instead of localhost.
+      BACKEND_URL: http://backend:5000
+    depends_on:
+      - backend
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # The browser (not the container) talks to LiveKit/the backend, so
+        # these must stay as externally-reachable URLs, not service names.
+        REACT_APP_LIVEKIT_URL: ${REACT_APP_LIVEKIT_URL}
+        REACT_APP_BACKEND_URL: ${REACT_APP_BACKEND_URL:-http://localhost:5000}
+    container_name: ai-concierge-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  mongo-data:
