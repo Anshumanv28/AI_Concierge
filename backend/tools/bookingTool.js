@@ -8,6 +8,7 @@ const {
   isTimeTaken,
   findNearestAvailableSlots,
 } = require("../utils/slotFinder");
+const { toISTMidnightUTC } = require("../utils/timezone");
 
 /**
  * Create a new booking
@@ -92,7 +93,7 @@ const execute = async (params) => {
     );
     const booking = await Booking.create({
       numberOfGuests,
-      bookingDate: new Date(bookingDate),
+      bookingDate: toISTMidnightUTC(bookingDate),
       bookingTime,
       cuisinePreference: cuisinePreference || "",
       specialRequests: specialRequests || "",
@@ -101,7 +102,8 @@ const execute = async (params) => {
       customerName: customerName || "Guest",
       customerEmail: customerEmail || "",
       customerContact: customerContact || "",
-      status: "pending",
+      // Auto-confirmed: there's no manual/restaurant approval step in this flow.
+      status: "confirmed",
     });
 
     console.log(

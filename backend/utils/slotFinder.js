@@ -7,6 +7,7 @@
  * (24-hour integers, e.g. 11 and 22), falling back to 11-22 if unset/invalid.
  */
 const Booking = require("../models/Booking");
+const { toISTMidnightUTC } = require("./timezone");
 
 const DEFAULT_OPEN_HOUR = 11;
 const DEFAULT_CLOSE_HOUR = 22;
@@ -35,7 +36,7 @@ const minutesToTime = (mins) => {
 // All non-cancelled bookings for a date - the one query every call site should share.
 const getBookingsForDate = async (date) => {
   return Booking.find({
-    bookingDate: new Date(date),
+    bookingDate: toISTMidnightUTC(date),
     status: { $ne: "cancelled" },
   });
 };

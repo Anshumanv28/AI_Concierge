@@ -7,6 +7,7 @@ from livekit.agents import function_tool, RunContext
 from livekit.agents.voice import Agent, AgentSession
 from utils.tool_executor import ToolExecutor
 from utils.frontend_communicator import FrontendCommunicator
+from utils.email_extractor import is_valid_email, extract_email
 from typing import Dict, Any, Optional
 
 
@@ -117,7 +118,8 @@ class VoiceAgent(Agent):
         Returns:
             Created booking data including booking ID. On failure due to a conflicting
             slot, includes an `alternatives` array of up to 3 real nearby available
-            HH:mm times - offer these instead of guessing.
+            HH:mm times - offer these instead of guessing. If the provided email looked
+            invalid, includes an `emailWarning` - ask the customer to repeat their email.
         """
         print(f"🔧 [AGENT_TOOL] create_booking called with guests={numberOfGuests}, date={bookingDate}, time={bookingTime}")
         params = {
@@ -133,17 +135,31 @@ class VoiceAgent(Agent):
             params['seatingPreference'] = seatingPreference
         if customerName:
             params['customerName'] = customerName
-        if customerEmail:
-            params['customerEmail'] = customerEmail
         if customerContact:
             params['customerContact'] = customerContact
-        
+
+        # Normalize the spoken email before forwarding it - STT often mangles
+        # addresses (e.g. "john at gmail dot com"), and a malformed address
+        # would otherwise be silently saved and fail to deliver.
+        email_warning = None
+        if customerEmail:
+            normalized_email = customerEmail if is_valid_email(customerEmail) else extract_email(customerEmail)
+            if normalized_email:
+                params['customerEmail'] = normalized_email
+            else:
+                email_warning = (
+                    "The email address didn't look valid, so it wasn't saved. "
+                    "Ask the customer to repeat their email clearly if they still want a confirmation."
+                )
+
         result = await self.tool_executor.execute('create-booking', params)
         if result.get('success'):
             booking_data = result.get('data', {})
             booking_id = booking_data.get('booking', {}).get('_id') or booking_data.get('bookingId') or booking_data.get('_id')
             print(f"✅ [AGENT_TOOL] create_booking result: Booking created with ID {booking_id}")
             print(f"📋 [AGENT_TOOL] Booking details: {json.dumps(booking_data, default=str, indent=2)}")
+            if email_warning:
+                booking_data['emailWarning'] = email_warning
             return booking_data
         else:
             error = result.get('error', 'Unknown error')
@@ -152,6 +168,8 @@ class VoiceAgent(Agent):
             response = {'error': error}
             if error_data.get('alternatives'):
                 response['alternatives'] = error_data['alternatives']
+            if email_warning:
+                response['emailWarning'] = email_warning
             return response
     
     @function_tool()

@@ -7,6 +7,7 @@ const {
   isTimeTaken,
   findNearestAvailableSlots,
 } = require("../utils/slotFinder");
+const { toISTMidnightUTC } = require("../utils/timezone");
 
 /**
  * POST /api/bookings
@@ -26,6 +27,7 @@ router.post("/", async (req, res) => {
       specialRequests,
       weatherInfo,
       seatingPreference,
+      customerName,
       customerEmail,
       customerContact,
     } = req.body;
@@ -75,21 +77,23 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Create booking (customerName defaults to "Guest" in schema)
+    // Create booking (customerName defaults to "Guest" in schema if omitted)
     console.log(
       `📋 [BACKEND] Seating preference: "${seatingPreference}" → normalized to "${normalizedSeatingPreference}"`
     );
     const booking = await Booking.create({
       numberOfGuests,
-      bookingDate: new Date(bookingDate),
+      bookingDate: toISTMidnightUTC(bookingDate),
       bookingTime,
       cuisinePreference: cuisinePreference || "",
       specialRequests: specialRequests || "",
       weatherInfo: weatherInfo || null,
       seatingPreference: normalizedSeatingPreference,
+      customerName: customerName || "Guest",
       customerEmail: customerEmail || "",
       customerContact: customerContact || "",
-      status: "pending",
+      // Auto-confirmed: there's no manual/restaurant approval step in this flow.
+      status: "confirmed",
     });
 
     const duration = Date.now() - startTime;

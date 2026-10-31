@@ -14,6 +14,7 @@ const BookingConfirmation = ({ booking }) => {
       year: "numeric",
       month: "long",
       day: "numeric",
+      timeZone: "Asia/Kolkata",
     });
   };
 

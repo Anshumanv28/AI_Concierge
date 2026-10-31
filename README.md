@@ -247,8 +247,8 @@ Frontend runs on `http://localhost:3000`
 4. Agent fetches weather for booking date
 5. Agent suggests indoor/outdoor seating based on weather
 6. Agent confirms all details
-7. Agent creates booking (status: "pending")
-8. Backend sends email confirmation to restaurant
+7. Agent creates booking (status: "confirmed", auto-confirmed on success)
+8. Backend sends email confirmation to the restaurant, and to the customer if an email was provided
 9. Agent confirms booking success to user
 
 ## Key Implementation Details
@@ -256,10 +256,10 @@ Frontend runs on `http://localhost:3000`
 ### Booking Schema
 
 - `bookingId`: MongoDB `_id` (auto-generated)
-- `customerName`: Hardcoded as "Guest"
+- `customerName`: Captured from the conversation; falls back to "Guest" if the customer doesn't provide one
 - `bookingTime`: 24-hour format (HH:mm)
-- `bookingDate`: Date object (Mumbai IST timezone)
-- `status`: Always "pending" on creation
+- `bookingDate`: Date object, explicitly anchored to IST midnight (`backend/utils/timezone.js`)
+- `status`: "confirmed" on successful creation (auto-confirmed - no manual/restaurant approval step exists); "cancelled" via the cancel endpoint
 - `weatherInfo`: `{ condition, temperature, description }`
 
 ### Duplicate Prevention
@@ -332,9 +332,9 @@ curl -X POST http://localhost:5000/api/bookings \
 
 ## Development Notes
 
-- All times stored in Mumbai IST timezone (no UTC conversion)
-- Customer name is hardcoded as "Guest" (simplified for demo)
-- Booking status always "pending" (no auto-confirmation)
+- All times are explicitly anchored to Asia/Kolkata (IST) via `backend/utils/timezone.js`, independent of the server's OS timezone
+- Customer name/email are captured from the conversation; "Guest"/no-email is only a fallback if the customer declines
+- Bookings are auto-confirmed on successful creation (status: "confirmed") - there's still no restaurant-approval step
 - Weather data fetched fresh for each booking (no caching)
 
 ## Future Enhancements
