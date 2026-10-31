@@ -1,5 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { Room, RoomEvent, RemoteParticipant, Track } from "livekit-client";
+import {
+  Room,
+  RoomEvent,
+  RemoteParticipant,
+  Track,
+  DataPacket_Kind,
+} from "livekit-client";
 import { getLiveKitConfig } from "../utils/livekitConfig";
 
 export const useLiveKit = () => {
@@ -16,6 +22,7 @@ export const useLiveKit = () => {
   const [options, setOptions] = useState([]); // Selectable options from agent
   const [optionsMessage, setOptionsMessage] = useState(null); // Message with options
   const [currentSpeech, setCurrentSpeech] = useState(""); // Current text being spoken
+  const [booking, setBooking] = useState(null); // Confirmed booking details from agent
 
   const connect = useCallback(async () => {
     if (isConnecting || isConnected) return;
@@ -235,6 +242,13 @@ export const useLiveKit = () => {
                     return;
                   }
 
+                  // Handle a confirmed booking
+                  if (data.type === "booking_confirmed") {
+                    console.log("Booking confirmation received:", data.booking);
+                    setBooking(data.booking || null);
+                    return;
+                  }
+
                   // Handle current speech
                   if (data.type === "current_speech") {
                     console.log("Current speech received:", data.text);
@@ -371,6 +385,7 @@ export const useLiveKit = () => {
       setAgentState(null);
       setAgentStateMessage(null);
       setIsUserExpectedToSpeak(false);
+      setBooking(null);
     }
   }, [room]);
 
@@ -400,7 +415,7 @@ export const useLiveKit = () => {
 
         await room.localParticipant.publishData(
           new TextEncoder().encode(messageData),
-          { reliable: true }
+          DataPacket_Kind.RELIABLE
         );
 
         console.log("✅ Text message sent to agent:", text.trim());
@@ -435,7 +450,7 @@ export const useLiveKit = () => {
 
         await room.localParticipant.publishData(
           new TextEncoder().encode(messageData),
-          { reliable: true }
+          DataPacket_Kind.RELIABLE
         );
 
         console.log("✅ Option selection sent to agent:", option);
@@ -469,6 +484,7 @@ export const useLiveKit = () => {
     options,
     optionsMessage,
     currentSpeech,
+    booking,
     connect,
     disconnect,
     addTranscriptEntry,

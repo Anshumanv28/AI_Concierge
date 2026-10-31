@@ -160,6 +160,17 @@ class VoiceAgent(Agent):
             print(f"📋 [AGENT_TOOL] Booking details: {json.dumps(booking_data, default=str, indent=2)}")
             if email_warning:
                 booking_data['emailWarning'] = email_warning
+
+            # Notify the frontend so BookingConfirmation can render. The backend
+            # nests the Mongoose doc under `booking` and calls the id field `_id`;
+            # flatten it to the shape BookingConfirmation.js expects.
+            booking_doc = booking_data.get('booking')
+            if booking_doc:
+                await self.frontend_comm.send_booking_confirmation({
+                    **booking_doc,
+                    'bookingId': booking_doc.get('bookingId') or booking_doc.get('_id'),
+                })
+
             return booking_data
         else:
             error = result.get('error', 'Unknown error')
@@ -278,10 +289,18 @@ class VoiceAgent(Agent):
         if room:
             import asyncio
             # Listen for data received events - use sync callback that creates async task
-            # LiveKit's .on() requires a sync callback, so we wrap the async handler
-            def on_data_received(data: bytes, participant, kind, topic):
-                # Create async task from sync callback
-                asyncio.create_task(self._on_data_received(data, participant, kind, topic))
+            # LiveKit's .on() requires a sync callback, so we wrap the async handler.
+            # The SDK emits a single DataPacket(data, kind, participant, topic) object,
+            # not separate positional args.
+            def on_data_received(data_packet):
+                asyncio.create_task(
+                    self._on_data_received(
+                        data_packet.data,
+                        data_packet.participant,
+                        data_packet.kind,
+                        data_packet.topic,
+                    )
+                )
             
             room.on("data_received", on_data_received)
         
@@ -290,9 +309,9 @@ class VoiceAgent(Agent):
     async def _on_data_received(self, data: bytes, participant, kind, topic):
         """Handle data channel messages from frontend"""
         try:
-            # Process messages from remote participants (users)
-            # In LiveKit, the agent is the local participant, users are remote
-            if participant and not participant.is_local:
+            # DataPacket.participant is RemoteParticipant | None (None only for
+            # data sent by a server SDK), so a truthy participant is always remote.
+            if participant:
                 import json
                 message = json.loads(data.decode('utf-8'))
                 
@@ -300,10 +319,19 @@ class VoiceAgent(Agent):
                 if message.get('type') == 'option_selected':
                     await self.on_option_selected(message.get('option'))
                 
-                # Handle user message (typed input) - this is also handled by on_user_turn_completed
+                # Handle user message (typed input). Unlike voice, text input never goes
+                # through STT/AgentSession's automatic turn pipeline, so we have to both
+                # report the turn (for transcript/logging, same as on_option_selected) and
+                # explicitly ask the session to generate a reply for it.
                 elif message.get('type') == 'user_message':
-                    # Log it but let on_user_turn_completed handle it
-                    print(f"📨 [AGENT] Received user message via data channel: {message.get('text')}")
+                    text = message.get('text')
+                    print(f"📨 [AGENT] Received user message via data channel: {text}")
+                    if text and self._session:
+                        import types
+                        await self.on_user_turn_completed(
+                            None, types.SimpleNamespace(content=text)
+                        )
+                        self._session.generate_reply(user_input=text)
         except Exception as e:
             print(f"Error handling data channel message: {e}")
     

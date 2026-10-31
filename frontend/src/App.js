@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { useLiveKit } from "./hooks/useLiveKit";
 import VoiceInterface from "./components/VoiceInterface";
 import Conversation from "./components/Conversation";
@@ -28,12 +28,12 @@ function App() {
     options,
     optionsMessage,
     currentSpeech,
+    booking,
     connect,
     disconnect,
     sendTextMessage,
     sendOptionSelection,
   } = useLiveKit();
-  const [booking, setBooking] = useState(null);
   const { isMobile, isTablet } = useResponsive();
 
   const handleConnect = async () => {
@@ -42,7 +42,6 @@ function App() {
 
   const handleDisconnect = async () => {
     await disconnect();
-    setBooking(null);
   };
 
   // App container style

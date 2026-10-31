@@ -95,6 +95,26 @@ class FrontendCommunicator:
         except Exception as e:
             print(f"Error sending transcript to frontend: {e}")
     
+    async def send_booking_confirmation(self, booking: Dict[str, Any]):
+        """
+        Send a confirmed booking's details to the frontend to render
+        BookingConfirmation.
+        Args:
+            booking: Flat booking dict matching frontend/src/components/BookingConfirmation.js's
+                expected fields (bookingId, numberOfGuests, bookingDate, bookingTime, status, ...)
+        """
+        if not self.session:
+            return
+
+        try:
+            data = {
+                'type': 'booking_confirmed',
+                'booking': booking,
+            }
+            await self._send_data(data)
+        except Exception as e:
+            print(f"Error sending booking confirmation to frontend: {e}")
+
     async def _send_data(self, data: Dict[str, Any]):
         """Internal method to send data via data channel"""
         if not self.room:
