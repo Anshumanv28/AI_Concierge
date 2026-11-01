@@ -91,6 +91,14 @@ LiveKit recording/session path) — `.gitignore` was tightened afterward to stop
 Newest entries at the top. Format: `### YYYY-MM-DD — short title` then a few bullet lines on
 what changed/was decided/was discovered and why it matters for future work.
 
+### 2026-11-01 — Confirmed GitHub contributor graph recalculated to solo-author
+- Checked `GET /repos/Anshumanv28/AI_Concierge/stats/contributors` (GitHub's actual contributor-stats
+  API, same data source the repo's Insights → Contributors graph reads) after the history rewrite
+  in the entry below. Returns exactly one contributor — `Anshumanv28`, 20 total commits — no trace
+  of "claude" anywhere. Confirms GitHub had already finished its async stats recompute; the
+  Co-Authored-By-trailer removal fully achieved the user's "don't want claude to show up as a
+  contributor at all" goal, nothing further needed.
+
 ### 2026-11-01 — Restructured README for resume/portfolio presentation (gen-AI role)
 - User is using this repo as a gen-AI-role resume project and asked whether the README read as
   professional. It didn't: it opened with install/env-var instructions and buried the actually
