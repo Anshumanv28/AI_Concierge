@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Room,
   RoomEvent,
@@ -7,6 +7,29 @@ import {
   DataPacket_Kind,
 } from "livekit-client";
 import { getLiveKitConfig } from "../utils/livekitConfig";
+import { getAnonId } from "../utils/anonId";
+
+// Shared cleanup for a room, used whether the user clicks disconnect, the
+// agent ends the call remotely, or the connection just drops.
+const cleanupRoom = async (targetRoom) => {
+  if (!targetRoom) return;
+  if (targetRoom._speechRecognition) {
+    targetRoom._speechRecognition.stop();
+    delete targetRoom._speechRecognition;
+  }
+  if (targetRoom._agentAudioElements) {
+    targetRoom._agentAudioElements.forEach((audioEl) => {
+      audioEl.pause();
+      audioEl.srcObject = null;
+    });
+    delete targetRoom._agentAudioElements;
+  }
+  try {
+    await targetRoom.disconnect();
+  } catch (e) {
+    // already disconnected
+  }
+};
 
 export const useLiveKit = () => {
   const [room, setRoom] = useState(null);
@@ -23,6 +46,24 @@ export const useLiveKit = () => {
   const [optionsMessage, setOptionsMessage] = useState(null); // Message with options
   const [currentSpeech, setCurrentSpeech] = useState(""); // Current text being spoken
   const [booking, setBooking] = useState(null); // Confirmed booking details from agent
+  const [conversationId, setConversationId] = useState(null); // Backend record for this session
+  const [remoteMicCommand, setRemoteMicCommand] = useState(null); // Agent's requested mic state: { enabled, nonce }
+  const [isViewingHistory, setIsViewingHistory] = useState(false); // True while showing a past, read-only conversation
+
+  // Avoid saving a conversation record we just loaded for viewing back over itself
+  const conversationIdRef = useRef(null);
+  useEffect(() => {
+    conversationIdRef.current = conversationId;
+  }, [conversationId]);
+
+  // The DataReceived handler below is a closure created once per connect()
+  // call, so it can't read live `transcript` state directly (it would only
+  // ever see the empty array from the render it was created in). Keep a ref
+  // in sync instead, for the duplicate-check the handler needs to do.
+  const transcriptRef = useRef([]);
+  useEffect(() => {
+    transcriptRef.current = transcript;
+  }, [transcript]);
 
   const connect = useCallback(async () => {
     if (isConnecting || isConnected) return;
@@ -30,8 +71,14 @@ export const useLiveKit = () => {
     try {
       setIsConnecting(true);
       setError(null);
+      // Starting a fresh live session - clear anything we were viewing/showing
+      setIsViewingHistory(false);
+      setTranscript([]);
+      setBooking(null);
+      setConversationId(null);
 
       const config = getLiveKitConfig();
+      const anonId = getAnonId();
 
       // Generate a unique room name and participant name
       const roomName = `restaurant-booking-${Date.now()}`;
@@ -63,6 +110,25 @@ export const useLiveKit = () => {
         throw new Error("No token received from server");
       }
 
+      // Start a conversation history record for this session (best-effort -
+      // the live call still works fine if this fails, it just won't be saved)
+      try {
+        const convoResponse = await fetch(
+          `${config.backendUrl}/api/conversations`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ anonId, roomName }),
+          }
+        );
+        if (convoResponse.ok) {
+          const { data } = await convoResponse.json();
+          setConversationId(data._id);
+        }
+      } catch (convoError) {
+        console.warn("Could not start conversation history record:", convoError);
+      }
+
       // Create a new room
       const newRoom = new Room();
 
@@ -84,6 +150,19 @@ export const useLiveKit = () => {
         setOptions([]);
         setOptionsMessage(null);
         setCurrentSpeech("");
+        // Transcript and booking deliberately survive a disconnect (whether
+        // the user clicked disconnect or the agent ended the call) so the
+        // chat stays visible afterward.
+
+        // Mark the conversation record ended, regardless of who disconnected.
+        if (conversationIdRef.current) {
+          const { backendUrl } = getLiveKitConfig();
+          fetch(`${backendUrl}/api/conversations/${conversationIdRef.current}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "ended" }),
+          }).catch(() => {});
+        }
       });
 
       newRoom.on(RoomEvent.ParticipantConnected, (participant) => {
@@ -246,6 +325,19 @@ export const useLiveKit = () => {
                   if (data.type === "booking_confirmed") {
                     console.log("Booking confirmation received:", data.booking);
                     setBooking(data.booking || null);
+                    if (conversationIdRef.current && data.booking?.bookingId) {
+                      const { backendUrl } = getLiveKitConfig();
+                      fetch(
+                        `${backendUrl}/api/conversations/${conversationIdRef.current}`,
+                        {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            bookingId: data.booking.bookingId,
+                          }),
+                        }
+                      ).catch(() => {});
+                    }
                     return;
                   }
 
@@ -253,6 +345,23 @@ export const useLiveKit = () => {
                   if (data.type === "current_speech") {
                     console.log("Current speech received:", data.text);
                     setCurrentSpeech(data.text || "");
+                    return;
+                  }
+
+                  // Handle the agent requesting the mic be turned on/off
+                  if (data.type === "mic_control") {
+                    console.log("Mic control received:", data.enabled);
+                    setRemoteMicCommand({
+                      enabled: !!data.enabled,
+                      nonce: Date.now(),
+                    });
+                    return;
+                  }
+
+                  // Handle the agent ending the call
+                  if (data.type === "end_session") {
+                    console.log("Agent ended the session");
+                    cleanupRoom(newRoom);
                     return;
                   }
 
@@ -273,23 +382,38 @@ export const useLiveKit = () => {
                       });
                       setAgentStateMessage(null);
 
-                      // Check for duplicates before adding
-                      setTranscript((prev) => {
-                        const isDuplicate = prev.some(
-                          (entry) =>
-                            entry.speaker === speaker &&
-                            entry.text === transcriptText
-                        );
-                        if (isDuplicate) {
-                          return prev; // Ignore duplicate
-                        }
-                      const newEntry = {
-                        speaker,
-                        text: transcriptText,
-                        timestamp: new Date(),
-                      };
-                        return [...prev, newEntry];
-                      });
+                      // Check for duplicates before adding - read from the
+                      // ref, not a flag set inside the updater below (that
+                      // updater isn't guaranteed to run synchronously, so a
+                      // closure variable it sets can't be trusted on the
+                      // next line - this bit the mic auto-control below).
+                      const isDuplicate = transcriptRef.current.some(
+                        (entry) =>
+                          entry.speaker === speaker &&
+                          entry.text === transcriptText
+                      );
+
+                      if (!isDuplicate) {
+                        const newEntry = {
+                          speaker,
+                          text: transcriptText,
+                          timestamp: new Date(),
+                        };
+                        setTranscript((prev) => [...prev, newEntry]);
+
+                        // Deterministic mic auto-control, keyed off the turn
+                        // actually completing (this transcript message), not
+                        // audio playback events - those didn't prove
+                        // reliable to depend on in testing. The agent's own
+                        // set_microphone tool (handled above, data.type ===
+                        // "mic_control") is still honored if the LLM does
+                        // call it; this is just the reliable default so the
+                        // mic reliably follows whose turn it is either way.
+                        setRemoteMicCommand({
+                          enabled: speaker === "agent",
+                          nonce: Date.now(),
+                        });
+                      }
                     }
                     return; // Don't process other message types
                   }
@@ -364,28 +488,11 @@ export const useLiveKit = () => {
 
   const disconnect = useCallback(async () => {
     if (room) {
-      // Stop speech recognition if active
-      if (room._speechRecognition) {
-        room._speechRecognition.stop();
-        delete room._speechRecognition;
-      }
-      // Clean up audio elements
-      if (room._agentAudioElements) {
-        room._agentAudioElements.forEach((audioEl) => {
-          audioEl.pause();
-          audioEl.srcObject = null;
-        });
-        delete room._agentAudioElements;
-      }
-      await room.disconnect();
+      await cleanupRoom(room);
       setRoom(null);
-      setIsConnected(false);
-      setTranscript([]);
-      setIsAgentTyping(false);
-      setAgentState(null);
-      setAgentStateMessage(null);
-      setIsUserExpectedToSpeak(false);
-      setBooking(null);
+      // Transcript and booking are deliberately left as-is here - the
+      // RoomEvent.Disconnected handler above covers resetting connection
+      // state and marking the conversation record ended either way.
     }
   }, [room]);
 
@@ -462,6 +569,41 @@ export const useLiveKit = () => {
     [room, isConnected]
   );
 
+  // Load a past, read-only conversation from history onto the landing page
+  const loadConversation = useCallback(async (id) => {
+    try {
+      const { backendUrl } = getLiveKitConfig();
+      const response = await fetch(`${backendUrl}/api/conversations/${id}`);
+      if (!response.ok) throw new Error("Failed to load conversation");
+      const { data } = await response.json();
+      setTranscript(data.transcript || []);
+      setBooking(null);
+      setConversationId(null); // read-only view, don't let new events save over it
+      setIsViewingHistory(true);
+    } catch (err) {
+      console.error("Error loading conversation history:", err);
+      setError("Couldn't load that conversation");
+    }
+  }, []);
+
+  const closeHistoryView = useCallback(() => {
+    setIsViewingHistory(false);
+    setTranscript([]);
+    setBooking(null);
+  }, []);
+
+  // Persist the transcript as it grows, for the currently active (not
+  // history-viewing) conversation.
+  useEffect(() => {
+    if (!conversationId || isViewingHistory || transcript.length === 0) return;
+    const { backendUrl } = getLiveKitConfig();
+    fetch(`${backendUrl}/api/conversations/${conversationId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transcript }),
+    }).catch(() => {});
+  }, [transcript, conversationId, isViewingHistory]);
+
   useEffect(() => {
     return () => {
       if (room) {
@@ -485,10 +627,15 @@ export const useLiveKit = () => {
     optionsMessage,
     currentSpeech,
     booking,
+    conversationId,
+    remoteMicCommand,
+    isViewingHistory,
     connect,
     disconnect,
     addTranscriptEntry,
     sendTextMessage,
     sendOptionSelection,
+    loadConversation,
+    closeHistoryView,
   };
 };

@@ -91,6 +91,158 @@ LiveKit recording/session path) — `.gitignore` was tightened afterward to stop
 Newest entries at the top. Format: `### YYYY-MM-DD — short title` then a few bullet lines on
 what changed/was decided/was discovered and why it matters for future work.
 
+### 2026-11-01 — Replaced the end-of-call regex with a dedicated LLM inference call
+- **Supersedes the regex work in the two entries below.** User explicitly asked not to use regex
+  for this and to let the agent infer it via a tool call instead - reasonable, since the regex had
+  already needed one hand-patch for real phrasing gaps and would always need more (natural language
+  is unbounded; the user's own two failures were proof).
+- **New design** in `core/voice_agent.py`: `_should_end_call(user_text, agent_text)` makes a
+  **second, narrow OpenAI chat completion** after every agent reply - system prompt scoped to
+  exactly one decision ("should this call end now"), with only one tool available
+  (`end_call`, zero params) and `tool_choice="auto"`. This is still genuine LLM inference and still
+  a tool call (what the user asked for) - it just isn't the *primary* conversational LLM call, which
+  is where tool-calling for this kind of self-referential action proved unreliable all session (see
+  entry two below). A dedicated call with nothing else to do and only one tool to weigh turns out to
+  actually get used, unlike `end_conversation` on the main agent (which remains registered as a
+  rarely-fired secondary path).
+- **Real bug caught before it shipped**: `AsyncOpenAI()` was first instantiated at module import
+  time, but `agent.py` imports `core.voice_agent` *before* calling `load_dotenv()` - so
+  `OPENAI_API_KEY` wasn't in the environment yet and the client constructor raised immediately,
+  which would have crashed the whole agent process on startup. Fixed with lazy initialization
+  (`_get_end_call_client()`, creates the client on first real use, well after `load_dotenv()` has
+  run). Confirmed via a standalone import with `OPENAI_API_KEY` deliberately unset that the module
+  now imports cleanly.
+- **Found and fixed a real false positive during testing**: the classifier's first version
+  incorrectly said yes for `("what time do you close", "We close at 10 PM, anything else?")` - a
+  reply that's still a question, not actually closing. Strengthened the classifier's system prompt
+  to explicitly say a reply containing any question (including a trailing "anything else?") is never
+  a closing exchange, regardless of other wording. Fixed on retest.
+- **Regression-tested with a 10-case async test script** (the API key loaded via `load_dotenv()`,
+  real calls made) covering both of the user's real failures, the previously-regex-passing cases,
+  and every real negative turn from the user's pasted transcript, including the false positive
+  above - all 10 pass. Re-verified live via Playwright against the running agent: replayed the exact
+  real failing phrase (ends correctly), and re-ran the two-turn mic+end-of-call combined test (mic
+  cycled off/on twice correctly, no premature ending, call ended correctly on the real closing
+  exchange, zero console errors).
+- Added `openai>=1.0.0` to `agent/requirements.txt` (previously only an indirect dependency via
+  `livekit-plugins-openai`; now imported and used directly).
+- Not committed as of this writing.
+
+### 2026-11-01 — Broadened the closing-exchange regex after a real user session exposed two gaps
+- User pasted a real transcript of their own test: two separate attempts to end the call both
+  failed to disconnect. Root cause: `_USER_CLOSING_PATTERN` (added in the entry below) was too
+  narrow. "So that will be all. Thank you." didn't match (pattern only had the contracted
+  `that'?ll be all`, not uncontracted "that will be all"); "Now I don't need anything else. You can
+  disconnect the chat." didn't match either (pattern only had "nothing else", not "don't need
+  anything else", and had no "disconnect" phrase at all despite that being about as explicit an
+  end-of-call signal as exists).
+- **Fixed** `core/voice_agent.py`'s `_USER_CLOSING_PATTERN`: added `that('ll| will)( be)? all`,
+  `(don'?t|do not|won'?t|will not) need (anything|nothing) else`, and `(you can |please
+  )?disconnect`. Regression-tested with a 13-case table covering both real failures (now True),
+  both previously-working cases (still True), and every actual negative turn from the user's own
+  pasted transcript (all still False - no new false positives, e.g. "...If there's anything else you
+  need, please let me know!" correctly stays False since it has no farewell words).
+  `_AGENT_FAREWELL_PATTERN` needed no changes - both real agent replies already matched it fine.
+- **Verified live**: replayed the exact failing phrase ("So that will be all. Thank you.") against
+  the running agent - `Agent ended the session` fired at +22.2s, screenshotted "CALL ENDED" with
+  the transcript intact. Not fully exhaustive (natural language has unlimited phrasings this
+  pattern-based approach can't cover completely), but broadened to the specific real cases that
+  broke, same pragmatic approach as the entry below.
+- Not committed as of this writing.
+
+### 2026-11-01 — Made mic-control/end-of-call reliable: deterministic fallbacks, not more prompting
+- **Follow-up to the entry below**, which left `set_microphone`/`end_conversation` as LLM-tool-only
+  and "not resolved" (model wouldn't call them). User explicitly asked to make it reliable rather
+  than accept the limitation. Stopped trying to fix this with more prompting (already proven not to
+  work) and instead added **deterministic, code-driven fallbacks** that don't depend on the LLM
+  choosing to call anything - mirroring how `isUserExpectedToSpeak`/`agentState` already worked
+  reliably elsewhere in this codebase (driven by actual events, not LLM judgment).
+- **End-of-call**: added `_looks_like_closing_exchange(user_text, agent_text)` to
+  `core/voice_agent.py` - a regex check (user said something like "that's all"/"goodbye" AND the
+  agent's reply reads as a farewell with no question mark) run inside the existing
+  `_conversation_item_added` transcript callback, which already reliably fires for every agent
+  message (code-driven, not an LLM tool call). When it matches, calls a new shared
+  `_end_conversation_now()` (refactored out of the `end_conversation` tool, which still exists as a
+  secondary path the LLM can also trigger, rarely does). `agent.py`'s `on_user_turn_completed` now
+  tracks `self._last_user_text` for this check, covering voice/typed/option-click input alike since
+  all three already funnel through that one method.
+- **Mic auto-control**: tried driving it off `isAgentSpeaking`/track "started"/"ended" events first
+  (matching the existing `isUserExpectedToSpeak` pattern) - **but discovered via live Playwright
+  testing that those audio-track events never fired at all** in the fake-media-device test harness
+  (and plausibly are just slow/unreliable in general, decoupled from when the text itself is ready).
+  Switched to a more robust signal already proven reliable all session: the `transcript` data-channel
+  message itself. `useLiveKit.js`'s `data.type === "transcript"` handler now sets
+  `remoteMicCommand` directly - `enabled: false` when a `user`-speaker entry is added (their turn
+  just got logged, agent's about to think), `enabled: true` when an `agent`-speaker entry is added
+  (agent's done, customer's turn). No dependency on TTS playback completing.
+- **Found and fixed a real React bug while wiring the above**: initially tried signaling "was a new
+  transcript entry actually added" by mutating a `wasAdded` flag *inside* the `setTranscript(prev =>
+  ...)` updater function and reading it on the next line - this is unreliable because React doesn't
+  guarantee that updater runs synchronously before subsequent code executes. Confirmed via a
+  temporary debug `useEffect` log that the "user" speaker's mic-off signal never fired while the
+  later "agent" one sometimes did (timing-dependent, not deterministic). Fixed by adding a
+  `transcriptRef` (kept in sync via a small `useEffect`) and computing the duplicate-check *before*
+  calling `setTranscript`, using the ref instead of a value calculated inside the updater.
+- **Verified live, repeatedly, with timestamped console logs**: a full two-turn conversation showed
+  `Microphone disabled` firing right after each user message and `Microphone enabled` right after
+  each agent reply, and `Agent ended the session` firing ~7s after the closing exchange - all with
+  zero console/page errors. Screenshotted the final "CALL ENDED" state with full transcript intact.
+- The LLM tools (`set_microphone`, `end_conversation`) are left in place and still correctly wired -
+  on the rare occasion the model does call them, they still work (verified earlier) - but the
+  deterministic paths are now what the product actually relies on.
+- Not committed as of this writing, bundled with the entry below (same feature, same session).
+
+### 2026-11-01 — Chat history dashboard + agent mic/disconnect control tools (first pass, partial)
+- User asked for four things: (1) agent-controlled mic on/off, (2) agent self-disconnect once the
+  customer confirms the conversation is over, (3) chat transcript stays visible after disconnect
+  instead of disappearing, (4) a chat-history dashboard on the landing page, browsable, clickable to
+  view a past conversation. User explicitly chose **browser-scoped anonymous history** (no login
+  system exists) over a global/shared one, after briefly flagging the privacy tradeoff.
+- **(3) and (4) are built, verified live, and work correctly.** New backend: `models/Conversation.js`
+  + `routes/conversations.js` (POST create, GET list by `anonId`, GET one, PATCH to append
+  transcript/mark ended/link a bookingId), mounted at `/api/conversations`. New frontend:
+  `utils/anonId.js` (crypto.randomUUID stored in localStorage), `components/ChatHistory.js` (landing
+  page list, fetches by anonId), and `useLiveKit.js` gained `conversationId`/`isViewingHistory`
+  state, a `loadConversation(id)` loader, and a `closeHistoryView()` reset. Critically,
+  `RoomEvent.Disconnected`'s handler and the local `disconnect()` callback no longer clear
+  `transcript`/`booking` (previously both did) — the transcript now survives any disconnect, live
+  or historical. `App.js` now renders a read-only `Conversation` (no input panel — it already hides
+  itself based on the existing `isConnected` prop) whenever `transcript.length > 0 && !isConnected`,
+  with "← back" / "new_conversation()" controls. Verified end-to-end via Playwright: sent a message,
+  manually disconnected, confirmed the transcript stayed visible with a "CALL ENDED" label, clicked
+  back to see it listed under "CHAT HISTORY" on the landing page with a preview + timestamp, clicked
+  it and saw it reload read-only as "PAST CONVERSATION". Zero console errors throughout.
+- **(1) and (2) are fully implemented but the LLM won't reliably call them — a genuine, reproducible
+  finding, not a bug in the implementation.** Added `set_microphone(enabled)` and `end_conversation()`
+  as `@function_tool()`s on `VoiceAgent` (`core/voice_agent.py`), `FrontendCommunicator.send_mic_control`/
+  `send_end_session` (data-channel messages `mic_control`/`end_session`), frontend handling in
+  `useLiveKit.js` (new `remoteMicCommand` state + `cleanupRoom` helper shared between manual and
+  agent-initiated disconnect) and `VoiceInterface.js` (`setMicState(target)` extracted from the old
+  `toggleMic`, honored via a `useEffect` on `remoteMicCommand` that bypasses the `isAgentSpeaking`
+  guard since the agent decides timing itself; manual button still works on top at any time).
+  **Confirmed via a temporary diagnostic (`[t.info.name for t in self.tools]`, removed after) that
+  both tools ARE correctly registered** in the schema sent to the LLM — this ruled out a registration
+  bug. Despite that, across ~6 live test conversations (typed chat, both natural "that's all, goodbye"
+  phrasing and a direct explicit command telling the model to call the tool by name), the model never
+  once called either tool — it just writes the goodbye text (sometimes even narrating "*ending
+  conversation*" as fake stage directions) and leaves the call connected. Iterated prompt fixes in
+  `prompts.py`: a "Non-negotiable: ending a call" section with a concrete few-shot example at the very
+  top of the system prompt, explicit "tools are actions, not words" guidance, strengthened docstrings.
+  **None of it moved the needle.** Also tested swapping `gpt-4o-mini` → full `gpt-4o` (temporarily,
+  reverted after — did not want to leave a silent cost-increasing model change in place) — identical
+  failure, ruling out "model too small" as the explanation. Checked for a reserved-name collision in
+  livekit-agents' source (`grep` for `end_conversation`/`end_call`/`set_microphone`) — none found.
+  **Conclusion**: this looks like a specific weakness in this LLM/framework combo around
+  zero-information, fire-and-forget, self-referential "control" tool calls (as opposed to the
+  data-fetching/data-mutating tools like `create_booking`, which call reliably) — distinct from the
+  date-example-leak and goodbye-narration bugs fixed earlier this session, which were straightforwardly
+  fixable with better prompting. **Not resolved as of this writing.** Both tools are live in the
+  codebase and will fire correctly on the rare occasion the model does call them, but should not be
+  relied on. Worth revisiting with: `tool_choice` forcing, restructuring as non-optional step-counted
+  turns, or accepting this as a known limitation and keeping the user-facing manual mic button /
+  disconnect button as the reliable primary path (which they already are).
+- Did not commit as of this writing.
+
 ### 2026-11-01 — Frontend redesign: "mono" design system, following the standing design workflow
 - Full visual redesign of `frontend/src`, executed via the user's standing frontend-design workflow
   (design-taste-frontend's house rules + a pulled style from `bergside/awesome-design-skills` +

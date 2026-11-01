@@ -49,7 +49,8 @@ class RestaurantBookingAgent(VoiceAgent):
         
         # Log user input
         print(f"💬 [USER] {user_text}")
-        
+        self._last_user_text = user_text
+
         # Send user transcript to frontend
         await self.send_transcript('user', user_text)
         

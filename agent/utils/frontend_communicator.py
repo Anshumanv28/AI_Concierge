@@ -115,6 +115,40 @@ class FrontendCommunicator:
         except Exception as e:
             print(f"Error sending booking confirmation to frontend: {e}")
 
+    async def send_mic_control(self, enabled: bool):
+        """
+        Tell the frontend to turn the user's microphone on or off.
+        Args:
+            enabled: True to enable the mic, False to disable it
+        """
+        if not self.session:
+            return
+
+        try:
+            data = {
+                'type': 'mic_control',
+                'enabled': enabled,
+            }
+            await self._send_data(data)
+        except Exception as e:
+            print(f"Error sending mic control to frontend: {e}")
+
+    async def send_end_session(self):
+        """
+        Tell the frontend the conversation is over and it should disconnect
+        (keeping the transcript visible, just ending the live call).
+        """
+        if not self.session:
+            return
+
+        try:
+            data = {
+                'type': 'end_session',
+            }
+            await self._send_data(data)
+        except Exception as e:
+            print(f"Error sending end-session signal to frontend: {e}")
+
     async def _send_data(self, data: Dict[str, Any]):
         """Internal method to send data via data channel"""
         if not self.room:

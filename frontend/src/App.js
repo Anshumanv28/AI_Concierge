@@ -4,6 +4,7 @@ import VoiceInterface from "./components/VoiceInterface";
 import Conversation from "./components/Conversation";
 import BookingConfirmation from "./components/BookingConfirmation";
 import CurrentSpeech from "./components/CurrentSpeech";
+import ChatHistory from "./components/ChatHistory";
 import { colors, borderRadius, transitions, fonts } from "./utils/styles";
 import { useResponsive } from "./hooks/useResponsive";
 
@@ -23,10 +24,14 @@ function App() {
     optionsMessage,
     currentSpeech,
     booking,
+    remoteMicCommand,
+    isViewingHistory,
     connect,
     disconnect,
     sendTextMessage,
     sendOptionSelection,
+    loadConversation,
+    closeHistoryView,
   } = useLiveKit();
   const { isMobile, isTablet } = useResponsive();
 
@@ -37,6 +42,11 @@ function App() {
   const handleDisconnect = async () => {
     await disconnect();
   };
+
+  // A transcript is shown either while live, right after a call just ended
+  // (the chat stays visible), or while browsing a past conversation.
+  const showingTranscript = isConnected || transcript.length > 0;
+  const showHistoryList = !isConnected && !isConnecting && !showingTranscript;
 
   const appContainerStyle = {
     minHeight: "100vh",
@@ -180,6 +190,10 @@ function App() {
     outline: "none",
   };
 
+  const backButtonStyle = {
+    ...disconnectButtonStyle,
+  };
+
   const errorContainerStyle = {
     marginTop: "0.75rem",
     padding: "0.75rem 1rem",
@@ -199,6 +213,12 @@ function App() {
     display: "grid",
     gridTemplateColumns: isMobile || isTablet ? "1fr" : "360px 1fr",
     gap: isMobile ? "1rem" : "1rem",
+    width: "100%",
+  };
+
+  const singleColumnStyle = {
+    maxWidth: "720px",
+    margin: "0 auto",
     width: "100%",
   };
 
@@ -224,7 +244,7 @@ function App() {
 
       <main style={mainStyle}>
         <div style={connectionSectionStyle}>
-          {!isConnected && !isConnecting && (
+          {!isConnected && !isConnecting && !showingTranscript && (
             <button
               onClick={handleConnect}
               style={connectButtonStyle}
@@ -283,12 +303,54 @@ function App() {
             </div>
           )}
 
+          {!isConnected && !isConnecting && showingTranscript && (
+            <div style={connectedContainerStyle}>
+              <span style={statusTextStyle}>
+                {isViewingHistory ? "PAST CONVERSATION" : "CALL ENDED"}
+              </span>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <button
+                  onClick={() => {
+                    closeHistoryView();
+                  }}
+                  style={backButtonStyle}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = colors.ink[700];
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = colors.paper[400];
+                  }}
+                  aria-label="Back to chat history"
+                >
+                  ← back
+                </button>
+                <button
+                  onClick={handleConnect}
+                  style={connectButtonStyle}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = colors.accent[300];
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = colors.accent[500];
+                  }}
+                  aria-label="Start a new conversation"
+                >
+                  new_conversation()
+                </button>
+              </div>
+            </div>
+          )}
+
           {error && (
             <div style={errorContainerStyle} role="alert">
               <p style={errorTextStyle}>error: {error}</p>
             </div>
           )}
         </div>
+
+        {showHistoryList && (
+          <ChatHistory onSelectConversation={loadConversation} />
+        )}
 
         {isConnected && (
           <div style={gridLayoutStyle}>
@@ -300,6 +362,7 @@ function App() {
                 agentState={agentState}
                 agentStateMessage={agentStateMessage}
                 isUserExpectedToSpeak={isUserExpectedToSpeak}
+                remoteMicCommand={remoteMicCommand}
                 onTranscriptUpdate={(entry) => {
                   // This will be handled by the conversation component
                 }}
@@ -322,6 +385,25 @@ function App() {
               />
               {booking && <BookingConfirmation booking={booking} />}
             </div>
+          </div>
+        )}
+
+        {!isConnected && showingTranscript && (
+          <div style={singleColumnStyle}>
+            <Conversation
+              transcript={transcript}
+              isAgentTyping={false}
+              isAgentSpeaking={false}
+              agentState={null}
+              agentStateMessage={null}
+              isUserExpectedToSpeak={false}
+              options={[]}
+              optionsMessage={null}
+              onSendMessage={() => {}}
+              onSelectOption={() => {}}
+              isConnected={false}
+            />
+            {booking && <BookingConfirmation booking={booking} />}
           </div>
         )}
 

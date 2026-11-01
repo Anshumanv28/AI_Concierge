@@ -8,6 +8,8 @@ const Booking = require("../models/Booking");
  * Send email confirmation
  * @param {Object} params - Tool parameters
  * @param {string} params.bookingId - Booking ID to send confirmation for
+ * @param {string} [params.customerEmail] - Corrected email to send to and save on the
+ *   booking, if the customer provided a different one than what's on record
  * @returns {Promise<Object>} Email sending status
  */
 const execute = async (params) => {
@@ -15,7 +17,7 @@ const execute = async (params) => {
   console.log(`📦 [EMAIL_TOOL] Params:`, JSON.stringify(params, null, 2));
 
   try {
-    const { bookingId } = params;
+    const { bookingId, customerEmail } = params;
 
     if (!bookingId) {
       const error = "Booking ID parameter is required";
@@ -30,6 +32,18 @@ const execute = async (params) => {
       const error = "Booking not found";
       console.error(`❌ [EMAIL_TOOL] ${error}`);
       throw new Error(error);
+    }
+
+    // If the customer gave a corrected email, save it on the booking so the
+    // record (and any future resend) uses the right address going forward.
+    if (customerEmail && customerEmail !== booking.customerEmail) {
+      console.log(
+        `✏️ [EMAIL_TOOL] Updating stored email from ${
+          booking.customerEmail || "(none)"
+        } to ${customerEmail}`
+      );
+      booking.customerEmail = customerEmail;
+      await booking.save();
     }
 
     // Send email confirmation

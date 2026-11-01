@@ -10,6 +10,7 @@ const VoiceInterface = ({
   agentState,
   agentStateMessage,
   isUserExpectedToSpeak,
+  remoteMicCommand,
   onTranscriptUpdate,
 }) => {
   const [isMicEnabled, setIsMicEnabled] = useState(false);
@@ -154,12 +155,14 @@ const VoiceInterface = ({
     };
   }, [room, isConnected]);
 
-  const toggleMic = async () => {
-    if (!room || !isConnected || isAgentSpeaking) return; // Don't allow toggling while agent is speaking
+  // Drives the mic to an explicit state, used by both the manual button and
+  // the agent's remote set_microphone commands.
+  const setMicState = async (targetEnabled) => {
+    if (!room || !isConnected) return;
 
     try {
       setMicError(null);
-      if (isMicEnabled) {
+      if (!targetEnabled) {
         // Disable mic
         const tracks = room.localParticipant.audioTracks;
         for (const [, publication] of tracks) {
@@ -198,7 +201,7 @@ const VoiceInterface = ({
         console.log("Microphone enabled");
       }
     } catch (error) {
-      console.error("Error toggling microphone:", error);
+      console.error("Error setting microphone state:", error);
       let errorMessage = "Failed to toggle microphone";
 
       if (
@@ -221,6 +224,22 @@ const VoiceInterface = ({
       setIsMicEnabled(false);
     }
   };
+
+  const toggleMic = () => {
+    if (!room || !isConnected || isAgentSpeaking) return; // Don't allow manual toggling while agent is speaking
+    setMicState(!isMicEnabled);
+  };
+
+  // Honor the agent's set_microphone tool calls. Unlike the manual button,
+  // this isn't blocked by isAgentSpeaking - the agent decides when it's
+  // appropriate (e.g. turning the mic on right as it finishes asking a
+  // question). The user's own button still works on top of this at any time.
+  useEffect(() => {
+    if (!remoteMicCommand || !room || !isConnected) return;
+    if (remoteMicCommand.enabled === isMicEnabled) return;
+    setMicState(remoteMicCommand.enabled);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remoteMicCommand, room, isConnected]);
 
   // Container styles
   const containerStyle = {
