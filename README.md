@@ -1,27 +1,37 @@
-# Restaurant Voice Booking Agent
+# Restaurant Voice Booking Agent 🎙️
 
 [![CI/CD](https://github.com/Anshumanv28/AI_Concierge/actions/workflows/ci.yml/badge.svg)](https://github.com/Anshumanv28/AI_Concierge/actions/workflows/ci.yml)
+[![Node 18+](https://img.shields.io/badge/node-18%2B-339933.svg)](https://nodejs.org/)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: ISC](https://img.shields.io/badge/License-ISC-yellow.svg)](https://opensource.org/licenses/ISC)
 
-A voice-native AI agent that books restaurant tables through natural conversation — no forms, no menus, no rigid dialogue tree. A customer talks to it like a host; the LLM decides what to ask, when to check real data, and when to act.
+> **A voice-native AI agent that books restaurant tables through natural conversation — no forms, no menus, no rigid dialogue tree.** A customer talks to it like a host; the LLM decides what to ask, when to check real data, and when to act.
 
-## Overview
+---
 
-This is an **agentic system**, not a scripted chatbot: OpenAI GPT drives the entire conversation and decides for itself — turn by turn — which tool to call (check a date, check the weather, check availability, create the booking), based on function-calling tool definitions rather than a hand-coded state machine. An earlier state-machine implementation was deleted entirely once the LLM-driven flow replaced it.
+## Screenshots
 
-A few things it's designed to get right, which matter more than the voice gimmick:
+**Landing + chat history** — past conversations from this browser, listed and clickable; no login system, so history is scoped anonymously via a local id rather than an account.
 
-- **Grounded, not hallucinated.** When a requested time slot is taken, the backend computes real nearby open slots and hands them to the LLM as data — the model offers genuine alternatives instead of inventing plausible-sounding ones. Weather-based seating suggestions come from a live OpenWeatherMap call, not an LLM guess.
-- **Real-time voice pipeline.** Built on LiveKit Agents (STT → LLM tool-calling → TTS), with a typed-chat fallback path that drives the same `AgentSession` so the agent behaves identically whether the input is speech or text.
-- **Correctness under timezone/concurrency edge cases.** All date/time logic is explicitly anchored to IST regardless of host OS timezone (`backend/utils/timezone.js`), and booking-conflict checks are centralized in one shared module (`backend/utils/slotFinder.js`) used by every code path that needs them, closing a class of bugs where duplicated conflict logic drifted out of sync.
-- **Shipped, not just coded.** Three services (Node/Express API, Python/LiveKit agent, React frontend) are each Dockerized, wired together with Compose, and built/validated/pushed to GitHub Container Registry on every merge via GitHub Actions — see [CI/CD](#cicd).
+![Landing screen with chat history](docs/screenshots/chat-history.png)
 
-## Demo
+**Live voice session** — real-time mic equalizer, live transcript, typed-chat fallback. The mic automatically turns on/off as the conversation hands off between customer and agent.
 
-| Landing screen | Live voice session | Booking confirmation |
-| --- | --- | --- |
-| ![Landing screen](docs/screenshots/landing.jpg) | ![Connected voice session](docs/screenshots/connected.jpg) | ![Booking confirmation](docs/screenshots/booking-confirmation.jpg) |
+![Connected voice session](docs/screenshots/connected.png)
 
-## Architecture
+**Booking confirmed** — a real booking created end-to-end through the conversation above, rendered the moment the agent calls `create_booking`.
+
+![Booking confirmation](docs/screenshots/booking-confirmation.png)
+
+**Past conversation** — any chat stays visible, read-only, after the call ends — click back into it from the landing page's history list any time.
+
+![Past conversation view](docs/screenshots/past-conversation.png)
+
+---
+
+## What is this?
+
+This is an **agentic system**, not a scripted chatbot: OpenAI GPT drives the entire conversation and decides for itself — turn by turn — which tool to call, based on function-calling definitions rather than a hand-coded state machine. An earlier state-machine implementation was deleted entirely once the LLM-driven flow replaced it.
 
 ```
 Frontend (React)  ──LiveKit room──▶  Agent (Python)
@@ -29,7 +39,8 @@ Frontend (React)  ──LiveKit room──▶  Agent (Python)
      │                      function-call tools (check date,
      │  data channel                      check weather,
      │  (booking_confirmed,               check availability,
-     │   transcript, etc.)                create booking)
+     │   transcript, mic_control,         create booking,
+     │   end_session, etc.)               send email, ...)
      │                                    ▼
      └────────────────────────── Backend (Node/Express) ──▶ MongoDB
                                            │
@@ -37,355 +48,214 @@ Frontend (React)  ──LiveKit room──▶  Agent (Python)
                                            └──▶ NodeMailer (restaurant + customer email)
 ```
 
-The LLM (via the agent process) is the only thing deciding *what* happens next; the backend only executes well-defined tool calls and never makes conversational decisions itself.
+The LLM is the only thing deciding *what* happens next; the backend only executes well-defined tool calls and never makes conversational decisions itself.
 
-## Tech Stack
+A few things it's designed to get right, which matter more than the voice gimmick:
 
-### Backend
+- **Grounded, not hallucinated.** When a requested time slot is taken, the backend computes real nearby open slots and hands them to the LLM as data — the model offers genuine alternatives instead of inventing plausible-sounding ones. Weather-based seating suggestions come from a live OpenWeatherMap call, not an LLM guess.
+- **Real-time voice pipeline.** Built on LiveKit Agents (STT → LLM tool-calling → TTS), with a typed-chat fallback path that drives the same `AgentSession` so the agent behaves identically whether the input is speech or text.
+- **Correctness under timezone/concurrency edge cases.** All date/time logic is explicitly anchored to IST regardless of host OS timezone, and booking-conflict checks are centralized in one shared module used by every code path that needs them.
+- **Shipped, not just coded.** Three services (Node/Express API, Python/LiveKit agent, React frontend) are each Dockerized, wired together with Compose, and built/validated/pushed to GitHub Container Registry on every merge via GitHub Actions — see [CI/CD](#cicd).
 
-- **Node.js** + **Express** — RESTful API
-- **MongoDB** + **Mongoose** — Database and ODM
-- **OpenWeatherMap API** — Live weather forecast data
-- **NodeMailer** — Email service
+---
 
-### Agent (Python)
+## What's built
 
-- **LiveKit Agents Framework** — Real-time voice pipeline + function-calling tool orchestration
-- **OpenAI GPT** — Drives the conversation and all tool-call decisions
-- **aiohttp** — Async HTTP client for the backend API
+### Voice & conversation
 
-### Frontend
+- ✅ **Real-time voice pipeline** — LiveKit Agents (STT → LLM tool-calling → TTS)
+- ✅ **Typed-chat fallback** — drives the exact same `AgentSession`, so text and voice behave identically
+- ✅ **Mono design system** — a deliberate, distinctive UI (Space Mono/JetBrains Mono typography, one accent hue reserved for the live/active moment), not a generic pastel-gradient AI template
+- ✅ **Agent-controlled microphone** — the mic turns off while the agent is talking/thinking and back on when it's the customer's turn, driven deterministically off the data channel's own transcript messages (manual override always available)
+- ✅ **Agent-initiated call ending** — the call ends itself once the customer confirms they're done, no manual disconnect required
 
-- **React** — UI framework
-- **LiveKit Client SDK** — Voice interaction client
+### Chat history
 
-## Project Structure
+- ✅ **Persistent, browsable history** — every conversation is saved server-side and listed on the landing page
+- ✅ **Browser-scoped, anonymous** — no login system exists, so history is tagged with a random id stored in the visitor's browser, not globally shared
+- ✅ **Survives disconnect** — the transcript stays on screen, read-only, after a call ends instead of disappearing
+- ✅ **Click to revisit** — any past conversation can be reopened from the landing page
 
+### Booking logic
+
+- ✅ **Real-data grounding** — live weather forecast, real computed alternative time slots, never LLM-invented
+- ✅ **Conflict-aware availability** — centralized conflict check across every code path, up to 3 real nearby alternatives offered on a clash
+- ✅ **Correctable mid-conversation** — a customer can correct their email or any detail and have the actual record (and any resend) reflect it
+- ✅ **IST-anchored dates** — all date/time logic anchored to Asia/Kolkata explicitly, independent of host OS timezone
+
+### Shipped
+
+- ✅ **Dockerized** — per-service Dockerfiles + root `docker-compose.yml`
+- ✅ **CI/CD** — GitHub Actions builds/validates all three services and pushes images to GHCR on every merge to `main`
+
+---
+
+## Engineering notes worth reading
+
+A few real bugs found and fixed along the way, because the fixes are more interesting than the feature list:
+
+- **An LLM few-shot leak caused every booking date to resolve to a hardcoded 2024 date.** The agent's own tool docstrings contained a literal example date ("if today is 2024-01-15, tomorrow is 2024-01-16") meant purely as illustration — the model pattern-matched and reused that literal value as the real `bookingDate` argument, even while correctly stating the real date in its spoken reply. Fixed by replacing every concrete example with an instruction to compute from the live `check_date` result.
+- **The LLM would not reliably call its own "end the call" or "control the mic" tools — across two model tiers.** Tested `gpt-4o-mini` and full `gpt-4o`, with aggressive prompting (explicit few-shot examples, "tools are actions, not words" guardrails) — the model would write a goodbye message, sometimes even narrate `` `end_conversation()` `` as literal text, and never actually invoke the tool. The fix wasn't more prompting: mic control is now driven deterministically off the already-reliable transcript data-channel messages, and call-ending is decided by a **second, narrow LLM call** scoped to exactly one structured decision (forced tool call, required `reasoning` + `should_end` fields) — isolated from the primary conversational turn where tool-calling for this kind of self-referential action proved unreliable.
+- **A naive `tool_choice="auto"` with one optional tool was still unreliable** — the dedicated classifier above first shipped as "any tool call = yes," which turned out biased toward calling the one available tool almost reflexively, including on a plain mid-task reply ("let me check the weather...") with zero farewell language. Fixed by forcing a single tool call with required `reasoning` + boolean `should_end` fields — the model can't skip straight to yes/no without explaining itself, which is the standard fix for calibrating a yes/no decision through function-calling.
+- **A real React bug**: a flag mutated inside a `setTranscript(prev => ...)` updater and read on the very next line isn't reliable — React doesn't guarantee that updater runs synchronously. Found via a live timestamped-console-log test showing the signal silently dropped half the time. Fixed with a `ref` kept in sync instead.
+- **A startup-crash bug caught before it shipped**: the OpenAI client for the end-call classifier was first created at module import time — but `agent.py` imports that module *before* calling `load_dotenv()`, so `OPENAI_API_KEY` wasn't set yet and the client constructor raised immediately. Fixed with lazy initialization.
+
+---
+
+## Quick Start
+
+```bash
+git clone https://github.com/Anshumanv28/AI_Concierge.git
+cd AI_Concierge
+
+# 1. Install everything (backend + frontend npm deps, agent pip deps)
+npm run install:all
+
+# 2. Create .env files in backend/, agent/, frontend/ — see Configuration below
+
+# 3. Run all three processes
+npm run backend:dev
+npm run agent
+npm run frontend
 ```
-restaurant-voice-agent/
-├── backend/           # Node.js + Express API
-│   ├── config/        # Database configuration
-│   ├── models/        # MongoDB models
-│   ├── routes/        # API routes
-│   ├── services/      # Business logic (weather, email)
-│   └── middleware/    # Error handling
-├── agent/             # Python LiveKit agent
-│   ├── utils/         # API client utilities
-│   └── agent.py       # Main agent entry point
-├── frontend/          # React frontend
-│   ├── src/
-│   │   ├── components/  # React components
-│   │   ├── hooks/       # Custom React hooks
-│   │   └── utils/        # Utility functions
-└── README.md
-```
 
-## Booking Flow
+Backend on `http://localhost:5000`, frontend on `http://localhost:3000`.
 
-1. User opens frontend and clicks "Connect to Agent"
-2. User speaks (or types): "I'd like to book a table"
-3. Agent collects: number of guests, preferred date and time, cuisine preference, special requests
-4. Agent calls the availability tool; if the slot is taken, the backend returns real nearby alternatives for the agent to offer
-5. Agent fetches live weather for the booking date and suggests indoor/outdoor seating accordingly
-6. Agent confirms all details with the user
-7. Agent calls the booking tool — booking is created with `status: "confirmed"` (auto-confirmed on success)
-8. Backend emails the restaurant, and the customer too if an email was captured
-9. Agent confirms booking success to the user
+---
 
-## Key Implementation Details
-
-### Booking Schema
-
-- `bookingId`: MongoDB `_id` (auto-generated)
-- `customerName` / `customerEmail`: Captured from the conversation; falls back to "Guest"/no-email only if the customer declines
-- `bookingTime`: 24-hour format (HH:mm)
-- `bookingDate`: Date object, explicitly anchored to IST midnight (`backend/utils/timezone.js`)
-- `status`: `"confirmed"` on successful creation (auto-confirmed — no manual/restaurant approval step exists); `"cancelled"` via the cancel endpoint
-- `weatherInfo`: `{ condition, temperature, description }`
-
-### Conflict Handling
-
-- Exact date + time match check, centralized in `backend/utils/slotFinder.js`
-- On conflict, up to 3 real nearby open slots are computed and returned so the agent never has to guess
-
-### Email Confirmations
-
-- Sent to `RESTAURANT_EMAIL` always, and additionally to the customer if a valid email was captured during the conversation
-- Booking succeeds even if the email send fails — errors are logged, never block the booking
-
-### Weather Integration
-
-- Real API data (not LLM-generated)
-- No caching — fresh fetch for each booking
-- OpenWeatherMap 5-day forecast API
-
-## Getting Started
+## Configuration
 
 ### Prerequisites
 
 - **Node.js** 18+ and npm
 - **Python** 3.9+
 - **MongoDB** (local or MongoDB Atlas)
-- **LiveKit Cloud** account (free tier: 1,000 minutes/month)
-- **OpenAI API** key
-- **OpenWeatherMap API** key
-- **Gmail SMTP** credentials (for email)
+- **LiveKit Cloud** account (free tier: 1,000 minutes/month) — [cloud.livekit.io](https://cloud.livekit.io)
+- **OpenAI API** key — [platform.openai.com](https://platform.openai.com)
+- **OpenWeatherMap API** key — [openweathermap.org](https://openweathermap.org/api)
+- **Gmail SMTP** app password (requires 2FA enabled first) — [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
 
-### 1. Clone and Install Dependencies
-
-```bash
-# Install all dependencies
-npm run install:all
-```
-
-Or install individually:
-
-```bash
-# Backend
-cd backend
-npm install
-
-# Frontend
-cd ../frontend
-npm install
-
-# Agent (Python)
-# Create venv in root (recommended for monorepo)
-python -m venv .venv
-.\.venv\Scripts\activate  # Windows
-# source .venv/bin/activate  # Mac/Linux
-
-# Install dependencies
-pip install -r agent/requirements.txt
-```
-
-### 2. MongoDB Setup
-
-#### Option A: MongoDB Atlas (Recommended)
-
-1. Create a free account at [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)
-2. Create a cluster and get your connection string
-3. Update `MONGODB_URI` in backend `.env`
-
-#### Option B: Local MongoDB
-
-1. Install MongoDB locally
-2. Start MongoDB service
-3. Use `mongodb://localhost:27017/restaurant-bookings` as `MONGODB_URI`
-
-### 3. LiveKit Cloud Setup
-
-1. Sign up at [cloud.livekit.io](https://cloud.livekit.io) (free tier available)
-2. Create a new project
-3. Get your credentials:
-   - **LIVEKIT_URL**: WebSocket URL (e.g., `wss://your-project.livekit.cloud`)
-   - **LIVEKIT_API_KEY**: API key from dashboard
-   - **LIVEKIT_API_SECRET**: API secret from dashboard
-
-### 4. API Keys Setup
-
-#### OpenAI API Key
-
-1. Sign up at [platform.openai.com](https://platform.openai.com)
-2. Create an API key
-3. Add to `agent/.env`
-
-#### OpenWeatherMap API Key
-
-1. Sign up at [openweathermap.org](https://openweathermap.org/api)
-2. Get your free API key (1,000 calls/day)
-3. Add to `backend/.env`
-
-#### Gmail SMTP (for Email)
-
-1. Enable 2-factor authentication on your Gmail account
-2. Generate an App Password:
-   - Go to Google Account → Security → App passwords
-   - Create app password for "Mail"
-3. Use your Gmail address and app password in `backend/.env`
-
-### 5. Environment Variables
-
-#### Backend (`backend/.env`)
+### Backend (`backend/.env`)
 
 ```env
-# MongoDB
 MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/restaurant-bookings
 
-# Weather API
 OPENWEATHER_API_KEY=your_openweathermap_api_key
 RESTAURANT_LOCATION=Mumbai
 
-# Email Configuration
 RESTAURANT_EMAIL=restaurant@example.com
 EMAIL_USER=your_email@gmail.com
 EMAIL_PASS=your_app_password
 
-# LiveKit (for token generation endpoint)
 LIVEKIT_API_KEY=your_livekit_api_key
 LIVEKIT_API_SECRET=your_livekit_api_secret
 
-# Server
 PORT=5000
 ```
 
-#### Agent (`agent/.env`)
+### Agent (`agent/.env`)
 
 ```env
-# LiveKit Cloud
 LIVEKIT_URL=wss://your-project.livekit.cloud
 LIVEKIT_API_KEY=your_livekit_api_key
 LIVEKIT_API_SECRET=your_livekit_api_secret
 
-# OpenAI
 OPENAI_API_KEY=your_openai_api_key
 
-# Backend API
 BACKEND_URL=http://localhost:5000
 ```
 
-#### Frontend (`frontend/.env`)
+### Frontend (`frontend/.env`)
 
 ```env
 REACT_APP_LIVEKIT_URL=wss://your-project.livekit.cloud
 REACT_APP_BACKEND_URL=http://localhost:5000
 ```
 
-**Note**: API keys and secrets should NEVER be in the frontend. Tokens are generated securely by the backend.
+API keys and secrets never live in the frontend — LiveKit tokens are minted server-side specifically to keep secrets out of the browser.
 
-**Note**: Create `.env` files in each directory (backend, agent, frontend) based on the `.env.example` files.
+---
 
-### Running the Application
+## Usage
 
-#### Start Backend
-
-```bash
-npm run backend:dev
-# or
-cd backend && npm run dev
-```
-
-Backend runs on `http://localhost:5000`
-
-#### Start Agent (Python)
+### Run natively
 
 ```bash
-npm run agent
-# or
+cd backend && npm run dev      # :5000
 cd agent && python agent.py dev
+cd frontend && npm start       # :3000
 ```
 
-#### Start Frontend
-
-```bash
-npm run frontend
-# or
-cd frontend && npm start
-```
-
-Frontend runs on `http://localhost:3000`
-
-#### Run with Docker Compose
-
-The whole stack (MongoDB + backend + agent + frontend) can also run in containers. You still need
-`backend/.env`, `agent/.env` and `frontend/.env` populated first (see above) — the images don't
-bundle any secrets.
+### Run with Docker Compose
 
 ```bash
 docker compose --env-file frontend/.env up --build
 ```
 
-Notes:
+`--env-file frontend/.env` is required because `REACT_APP_*` vars get baked into the frontend bundle at build time. The `backend`/`agent` containers get `MONGODB_URI`/`BACKEND_URL` overridden to point at the Compose network's service names; everything else comes from your `.env` files unchanged. If MongoDB is already running locally on 27017, stop it first or remove the `mongodb` service's `ports` mapping.
 
-- `--env-file frontend/.env` is required because `REACT_APP_LIVEKIT_URL` and `REACT_APP_BACKEND_URL`
-  get baked into the frontend bundle at build time, so Compose needs them for variable substitution
-  (not just as runtime env vars).
-- The `backend` and `agent` containers get `MONGODB_URI`/`BACKEND_URL` overridden to point at the
-  `mongodb`/`backend` service names on the Compose network — everything else comes from your `.env`
-  files unchanged.
-- If you already have MongoDB running locally on port 27017 (as in local dev), either stop it first
-  or remove the `mongodb` service's `ports` mapping in `docker-compose.yml`.
-- Backend: `http://localhost:5000`, Frontend: `http://localhost:3000`.
+### API endpoints
 
-## API Endpoints
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/bookings` | Create a booking |
+| `GET` | `/api/bookings` / `/:id` | List / get a booking |
+| `DELETE` | `/api/bookings/:id` | Cancel a booking |
+| `GET` | `/api/weather/:date` | Weather forecast (`YYYY-MM-DD`) |
+| `POST` | `/api/livekit/token` | Mint a LiveKit access token |
+| `POST` | `/api/conversations` | Start a conversation history record |
+| `GET` | `/api/conversations?anonId=` | List a browser's chat history |
+| `GET` / `PATCH` | `/api/conversations/:id` | Get / update one conversation |
 
-### Bookings
-
-- `POST /api/bookings` - Create a new booking
-- `GET /api/bookings` - Get all bookings
-- `GET /api/bookings/:id` - Get specific booking
-- `DELETE /api/bookings/:id` - Cancel booking
-
-### Weather
-
-- `GET /api/weather/:date` - Get weather forecast for date (YYYY-MM-DD format)
-
-### LiveKit
-
-- `POST /api/livekit/token` - Generate LiveKit access token for frontend (optional)
-
-## Testing
-
-### Manual Testing
-
-1. Start all services (backend, agent, frontend)
-2. Open frontend in browser
-3. Click "Connect to Agent"
-4. Speak (or type) a booking request
-5. Complete conversation flow
-6. Verify booking in database
-7. Check email confirmation
-
-### API Testing
+### Testing
 
 ```bash
-# Test weather endpoint
 curl http://localhost:5000/api/weather/2024-12-15
 
-# Test booking creation
 curl -X POST http://localhost:5000/api/bookings \
   -H "Content-Type: application/json" \
-  -d '{
-    "numberOfGuests": 2,
-    "bookingDate": "2024-12-15",
-    "bookingTime": "18:30",
-    "cuisinePreference": "Italian",
-    "specialRequests": "Window seat"
-  }'
+  -d '{"numberOfGuests": 2, "bookingDate": "2024-12-15", "bookingTime": "18:30", "cuisinePreference": "Italian"}'
 ```
+
+Manual: start all three services, open the frontend, click `connect_to_agent()`, speak or type a booking request, and verify the booking + email in MongoDB/your inbox.
+
+---
 
 ## CI/CD
 
 `.github/workflows/ci.yml` runs on every push and pull request to `main`:
 
-- **backend** / **frontend** / **agent** jobs install dependencies and validate each service builds
-  (the frontend job runs a full `react-scripts build`, which includes ESLint).
-- A **docker** job builds all three images (`backend/Dockerfile`, `agent/Dockerfile`,
-  `frontend/Dockerfile`) to confirm they're buildable, and on merges to `main` additionally pushes
-  them to GitHub Container Registry as `ghcr.io/<owner>/<repo>-{backend,agent,frontend}`, tagged
-  `latest` and with the commit SHA.
+- **backend** / **frontend** / **agent** jobs install dependencies and validate each service builds (the frontend job runs a full `react-scripts build`, which includes ESLint).
+- A **docker** job builds all three images to confirm they're buildable, and on merges to `main` additionally pushes them to GitHub Container Registry as `ghcr.io/<owner>/<repo>-{backend,agent,frontend}`, tagged `latest` and with the commit SHA.
 
-## Troubleshooting
+---
 
-### Backend Issues
+## Project structure
 
-- **MongoDB connection error**: Check `MONGODB_URI` and network connectivity
-- **Weather API error**: Verify `OPENWEATHER_API_KEY` is valid
-- **Email not sending**: Check Gmail app password and SMTP settings
+```
+AI_Concierge/
+├── backend/                 # Node.js + Express API
+│   ├── models/               # Booking, Conversation (Mongoose)
+│   ├── routes/                # bookings, weather, livekit, tools, conversations
+│   ├── services/              # emailService, weatherService
+│   ├── tools/                  # booking/date/email/weather tool wrappers
+│   └── utils/                  # slotFinder, timezone
+├── agent/                    # Python LiveKit agent
+│   ├── core/voice_agent.py     # Function tools, deterministic reliability fallbacks
+│   ├── tools/                  # Per-tool wrappers calling the backend
+│   ├── utils/                  # frontend_communicator, email_extractor
+│   ├── prompts.py              # System prompt
+│   └── agent.py                # Entry point
+└── frontend/                 # React + LiveKit Client SDK
+    └── src/
+        ├── components/          # VoiceInterface, Conversation, ChatHistory, BookingConfirmation
+        ├── hooks/                # useLiveKit (LiveKit session + data channel + history persistence)
+        └── utils/                # styles (mono design tokens), anonId, livekitConfig
+```
 
-### Agent Issues
+---
 
-- **LiveKit connection error**: Verify `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET`
-- **OpenAI API error**: Check `OPENAI_API_KEY` and account credits
-- **Backend API error**: Ensure backend is running on `BACKEND_URL`
-
-### Frontend Issues
-
-- **Connection failed**: Check LiveKit credentials in `.env`
-- **Microphone not working**: Grant browser microphone permissions
-- **No audio**: Check browser console for errors
-
-## Future Enhancements
+## Roadmap
 
 - Admin dashboard for booking management
 - SMS notifications via Twilio
@@ -393,10 +263,27 @@ curl -X POST http://localhost:5000/api/bookings \
 - Calendar integration with time slot management
 - Booking analytics and reporting
 
+---
+
+## Tech stack
+
+| Layer | Tool |
+|---|---|
+| Voice pipeline | LiveKit Agents (STT → LLM → TTS) |
+| LLM | OpenAI GPT (`gpt-4o-mini`) |
+| Backend | Node.js, Express, MongoDB/Mongoose |
+| Frontend | React, LiveKit Client SDK |
+| Weather | OpenWeatherMap |
+| Email | NodeMailer (Gmail SMTP) |
+| Containers | Docker, Docker Compose, GHCR |
+| CI | GitHub Actions |
+
+---
+
 ## License
 
 ISC
 
-## Author
+---
 
-Anshuman Mishra
+**Made with 🎙️ by [Anshuman](https://github.com/Anshumanv28)**

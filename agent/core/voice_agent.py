@@ -37,12 +37,36 @@ def _get_end_call_client() -> AsyncOpenAI:
     return _end_call_client
 
 
-_END_CALL_TOOL_SCHEMA = [{
+# A naive tool_choice="auto" with a single zero-param tool proved unreliable
+# in testing (false positives on plain mid-task statements with no farewell
+# language at all, e.g. "Now let me check the weather..."). The model seems
+# biased toward calling the one available tool somewhat reflexively rather
+# than genuinely weighing it. Fixed by FORCING a single "decide" tool call
+# with required reasoning + boolean fields every time - the model can't skip
+# straight to a yes/no without first articulating why, which is the standard
+# fix for calibrating a yes/no classification through function-calling.
+_DECIDE_TOOL_SCHEMA = [{
     "type": "function",
     "function": {
-        "name": "end_call",
-        "description": "Call this if and only if the call should end right now.",
-        "parameters": {"type": "object", "properties": {}},
+        "name": "decide",
+        "description": "Record the decision about whether the call should end now.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "reasoning": {
+                    "type": "string",
+                    "description": "One short sentence: why the call should or should not end now.",
+                },
+                "should_end": {
+                    "type": "boolean",
+                    "description": (
+                        "True only if the customer clearly indicated they're done AND the "
+                        "assistant's reply is purely a farewell, asking nothing further."
+                    ),
+                },
+            },
+            "required": ["reasoning", "should_end"],
+        },
     },
 }]
 
@@ -50,6 +74,11 @@ _END_CALL_TOOL_SCHEMA = [{
 async def _should_end_call(user_text: str, agent_text: str) -> bool:
     """Ask a dedicated LLM call whether the conversation just concluded."""
     if not user_text or not agent_text:
+        return False
+    if "?" in agent_text:
+        # Cheap, certain guard - the classifier is asked to apply this same
+        # rule below, but it has been caught missing it live, so don't trust
+        # it alone for something this consequential (ending the call).
         return False
     try:
         response = await _get_end_call_client().chat.completions.create(
@@ -59,13 +88,15 @@ async def _should_end_call(user_text: str, agent_text: str) -> bool:
                     "role": "system",
                     "content": (
                         "You monitor a restaurant booking call and decide whether it just "
-                        "ended. Call end_call only if the customer indicated they're done "
-                        "(e.g. said that's all, no thanks, goodbye, asked to disconnect) AND "
-                        "the assistant's reply is purely a closing/farewell message. If the "
-                        "assistant's reply asks the customer anything at all - including a "
-                        "trailing 'anything else?' or similar - the exchange is NOT over, even "
-                        "if it also says goodbye-sounding words; don't call end_call in that "
-                        "case. Otherwise, don't call anything."
+                        "ended. should_end is true ONLY if the customer clearly indicated "
+                        "they're done (e.g. said that's all, no thanks, goodbye, asked to "
+                        "disconnect) AND the assistant's reply is purely a closing/farewell "
+                        "message with nothing further asked or in progress. A reply that is "
+                        "still doing something mid-task (e.g. 'let me check the weather...', "
+                        "'one moment please', any question, anything not a goodbye) means "
+                        "should_end is false - the call is still active. When genuinely "
+                        "unsure, answer false; ending a call too early is worse than asking "
+                        "again next turn."
                     ),
                 },
                 {
@@ -73,11 +104,16 @@ async def _should_end_call(user_text: str, agent_text: str) -> bool:
                     "content": f"Customer: {user_text}\nAssistant: {agent_text}",
                 },
             ],
-            tools=_END_CALL_TOOL_SCHEMA,
-            tool_choice="auto",
-            max_tokens=20,
+            tools=_DECIDE_TOOL_SCHEMA,
+            tool_choice={"type": "function", "function": {"name": "decide"}},
+            max_tokens=150,
         )
-        return bool(response.choices[0].message.tool_calls)
+        tool_calls = response.choices[0].message.tool_calls
+        if not tool_calls:
+            return False
+        args = json.loads(tool_calls[0].function.arguments)
+        print(f"[AGENT] end-call classifier: {args.get('reasoning')} -> should_end={args.get('should_end')}")
+        return bool(args.get("should_end"))
     except Exception as e:
         print(f"Error in _should_end_call: {e}")
         return False
