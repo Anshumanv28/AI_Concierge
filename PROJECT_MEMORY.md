@@ -91,6 +91,28 @@ LiveKit recording/session path) — `.gitignore` was tightened afterward to stop
 Newest entries at the top. Format: `### YYYY-MM-DD — short title` then a few bullet lines on
 what changed/was decided/was discovered and why it matters for future work.
 
+### 2026-11-01 — Restructured README for resume/portfolio presentation (gen-AI role)
+- User is using this repo as a gen-AI-role resume project and asked whether the README read as
+  professional. It didn't: it opened with install/env-var instructions and buried the actually
+  interesting parts (LLM tool-calling architecture, real-data grounding, voice pipeline) far below.
+- **Rewrote `README.md`** (commit `2b470b2`): new top-of-file "Overview" section frames the project
+  explicitly as an *agentic* system — LLM decides which tool to call turn-by-turn rather than a
+  state machine (the deleted `flow_manager.py`/`conversation.py` from the 2026-10-26 entry below is
+  exactly this point) — and calls out real-data grounding (live weather API, computed alternative
+  slots instead of LLM-hallucinated ones) and the Docker/CI/CD setup as engineering signal. Added a
+  "Demo" section (moved screenshots up) and an ASCII architecture diagram. Pushed all
+  setup/env-var/troubleshooting content below a new "Getting Started" heading. Removed the old
+  emoji-bullet "Features" list and the separate "Development Notes" section, folding their content
+  into Overview / Key Implementation Details to cut duplication.
+- **Found and fixed two stale/incorrect claims while rewriting**: (1) "Future Enhancements" still
+  listed "Customer email collection and confirmations" even though that shipped in the 2026-10-26
+  customer-identity entry below; (2) "Key Implementation Details → Email Confirmations" said email
+  goes "to RESTAURANT_EMAIL (not customer)" — checked `backend/services/emailService.js` directly
+  and confirmed it *does* additionally email `booking.customerEmail` when one was captured (lines
+  ~131-141), contradicting that line and also contradicting the README's own "Booking Flow" section
+  a few headings below it. Corrected to match actual code behavior.
+- No code/logic changes, README-only.
+
 ### 2026-11-01 — Rewrote history to drop Co-Authored-By trailers; all older SHAs below are now stale
 - User found (via a downloaded GitHub "Commits.csv") that GitHub's contributor-insights graph was
   listing a separate "claude" contributor with 5 commits — caused by a `Co-Authored-By: Claude
