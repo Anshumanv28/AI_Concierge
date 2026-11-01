@@ -91,6 +91,49 @@ LiveKit recording/session path) — `.gitignore` was tightened afterward to stop
 Newest entries at the top. Format: `### YYYY-MM-DD — short title` then a few bullet lines on
 what changed/was decided/was discovered and why it matters for future work.
 
+### 2026-11-01 — Rewrote history to drop Co-Authored-By trailers; all older SHAs below are now stale
+- User found (via a downloaded GitHub "Commits.csv") that GitHub's contributor-insights graph was
+  listing a separate "claude" contributor with 5 commits — caused by a `Co-Authored-By: Claude
+  Sonnet 5 <noreply@anthropic.com>` trailer that Claude Code's default commit template appends.
+  User wants sole attribution to their own account (`Anshumanv28`) going forward, confirmed via
+  `gh auth status`/`git shortlog` that every commit is in fact authored/pushed under their own
+  credentials regardless — the trailer was the only thing causing the split, not a different
+  push identity. **Saved as a standing preference** (`feedback_no_coauthor_trailer` in the global
+  memory system) to omit this trailer on all future commits in this repo.
+- **Rewrote the 5 affected commits** (previously `c2c46d0`, `a9c3639`, `20be7a8`, `298f2c3`,
+  `00470ba` — now `c579fd7`, `febd9b7`, `fffe100`, `7def8d4`, `51b9b58` respectively) via
+  `git filter-branch --msg-filter` to strip the trailer line; verified tree contents byte-identical
+  (`git diff <old> <new> --stat` empty) before force-pushing. Force-pushed `main` to `origin` with
+  `--force-with-lease`; confirmed on GitHub. Stashed/restored an in-progress edit to this file
+  around the operation so the rewrite ran on a clean tree.
+- **Known side effect**: GHCR image tags from past CI runs that used the old short SHAs (e.g.
+  `ghcr.io/anshumanv28/ai_concierge-backend:00470ba`-style tags) no longer correspond to any commit
+  in `main`'s history — they still exist and are pullable, just orphaned. Not worth cleaning up
+  unless it becomes confusing later.
+- **Every commit SHA mentioned in Session Log entries below this one is now stale** (history was
+  rewritten from `7628d89..HEAD`, i.e. everything from "Suggest real alternative time slots" onward).
+  Left those entries' prose as-is rather than rewriting every reference — the *content/reasoning* in
+  them is still accurate, only the literal hash strings no longer resolve to anything.
+
+### 2026-11-01 — Confirmed CI is fully green after the `npm install` fix; CI/CD pipeline work is DONE
+- Checked `gh run list`/`gh run view` on the run for the "use npm install instead of npm ci" commit
+  (hash since rewritten, see entry above — was `00470ba`): all 6 jobs passed — Agent (Python),
+  Frontend (React), Backend (Node), and all three Docker build+push matrix legs
+  (backend/agent/frontend images, pushed to GHCR). Only annotations were GitHub's own Node 20
+  runner deprecation notices, not real failures. This closes out that entry's "next step" — no
+  further CI work needed right now.
+- **GHCR push specifically confirmed**: `.github/workflows/ci.yml`'s `docker/build-push-action@v5`
+  step has `push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}` — this run
+  was a `push` trigger on `main` (confirmed via `gh run list`'s event column), so push was active,
+  and the step completed with a green checkmark on all three matrix legs. Could not pull the raw
+  push/digest log line (`gh run view --log` returned empty output in this environment, and
+  `gh api /users/.../packages` needs a `read:packages` scope this token doesn't have) or list the
+  packages directly, so this is inferred from step success + trigger condition, not a literal digest
+  readout — strong but not 100%-direct confirmation. To get a fully direct check, visit
+  `github.com/Anshumanv28?tab=packages` in a browser.
+- **Status: the CI/CD + containerization initiative (started 2026-10-31) is complete.** Images:
+  `ghcr.io/anshumanv28/ai_concierge-{backend,agent,frontend}`, tagged `latest` + short SHA.
+
 ### 2026-10-31 — First real CI run failed; frontend's `npm ci` is unreliable, switched to `npm install`
 - Pushed the two commits above, checked the resulting GitHub Actions run (`gh run view`). Backend and
   Agent jobs passed; **Frontend job failed** on `npm ci` with the exact same "Missing: yaml@2.9.1
