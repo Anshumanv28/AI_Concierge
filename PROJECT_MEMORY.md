@@ -91,6 +91,52 @@ LiveKit recording/session path) — `.gitignore` was tightened afterward to stop
 Newest entries at the top. Format: `### YYYY-MM-DD — short title` then a few bullet lines on
 what changed/was decided/was discovered and why it matters for future work.
 
+### 2026-11-01 — Frontend redesign: "mono" design system, following the standing design workflow
+- Full visual redesign of `frontend/src`, executed via the user's standing frontend-design workflow
+  (design-taste-frontend's house rules + a pulled style from `bergside/awesome-design-skills` +
+  Playwright testing + a `web-design-guidelines` audit). User explicitly asked to use the "mono"
+  style from the awesome-design-skills registry mid-session.
+- **Before**: 5 competing pastel hue families (baby-blue-ice/aquamarine/rosy-taupe/blush-rose/
+  vintage-berry), gradients on nearly every button/bubble/bar, glassmorphism
+  (`backdropFilter: blur`), heavy soft shadows at rest, rounded-2xl everywhere, uppercase-tracked
+  "eyebrow" labels — textbook generic-AI-generated look.
+- **After**: "mono" system (Space Mono + JetBrains Mono monospace type, compact 4/8px-radius
+  density, one neon-green accent `#37F712` reserved for the live/active moment + the one primary
+  action, flat `paper`/`ink` neutral ramps, status set (success/warning/danger) used only for
+  status). Idea: the screen reads as a terminal/reservation ledger, not a SaaS marketing page —
+  `>_` mark, lowercase system copy, `connect_to_agent()`/`disconnect()` button labels (with plain
+  English `aria-label`s underneath for a11y).
+- **Rewrote**: `index.css` (new token set, trimmed to feedback-only animations), `utils/styles.js`
+  (honest renamed tokens: `colors.{paper,ink,accent,success,warning,danger}` — removed the old
+  5-hue family names and the `shadows`/`gradients`/`semanticColors` exports entirely, confirmed via
+  grep no file still referenced them), and all 6 component files (`App.js`, `VoiceInterface.js`,
+  `Conversation.js`, `OptionSelector.js`, `BookingConfirmation.js`, `CurrentSpeech.js`). Added
+  Google Fonts `<link>` tags to `public/index.html` for the two mono typefaces.
+- **Ran the `web-design-guidelines` audit** (fetched live from `vercel-labs/web-interface-guidelines`)
+  against the 6 changed files and fixed real findings: a bare `outline: none` on the chat input with
+  no focus replacement (now relies on the native focus ring), two `transition: all` usages (listed
+  explicit properties instead), literal `"..."` in UI copy → proper `…` throughout, missing
+  `aria-label` on the chat text input, missing hover state on the Send button, missing
+  `aria-hidden="true"` on the decorative mic SVG. Deliberately did NOT convert the existing
+  `onFocus`/`onBlur`-based focus-ring pattern to CSS `:focus-visible` classes — pre-existing
+  inline-style architecture across the whole app, out of scope for a design pass. Deliberately kept
+  lowercase system copy despite the guideline's generic "Title Case" preference — a defensible,
+  intentional choice for a terminal-style aesthetic, not an oversight.
+- **Verified live, end-to-end, not just compiled**: `CI=true npx react-scripts build` clean both
+  before and after the a11y fixes. Used the newly-installed global Playwright (see
+  `reference_playwright_cli_install` memory) to screenshot the built app at 1440/768/390px (zero
+  console errors at any width), then started the real stack (backend + agent + frontend natively;
+  `.env` files and MongoDB were already in place from the 2026-10-31 session) and drove a real
+  LiveKit connection with a fake-media Chromium (`--use-fake-device-for-media-stream`) to screenshot
+  the actual connected two-pane layout and a real typed message round-trip (confirmed via agent log
+  the agent genuinely replied — browser-side render of the agent's bubble just didn't land inside
+  the screenshot's wait window, a pre-existing latency characteristic unrelated to this round's CSS
+  changes, not investigated further as out of scope).
+- Killed all `node.exe`/`python.exe` processes afterward to stop the test stack — **this is
+  system-wide, not scoped to this repo's processes**; flagged to the user in case anything unrelated
+  was also running and needs restarting.
+- Not committed as of this writing — user has not yet asked to commit.
+
 ### 2026-11-01 — Confirmed GitHub contributor graph recalculated to solo-author
 - Checked `GET /repos/Anshumanv28/AI_Concierge/stats/contributors` (GitHub's actual contributor-stats
   API, same data source the repo's Insights → Contributors graph reads) after the history rewrite

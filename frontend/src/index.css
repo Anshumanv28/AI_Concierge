@@ -1,88 +1,37 @@
-/* Base Styles and CSS Variables */
+/* Base Styles and CSS Variables — "mono" design system (typeui.sh/bergside/awesome-design-skills) */
 :root {
-  /* Baby Blue Ice Colors */
-  --baby-blue-ice-50: #e7f1fd;
-  --baby-blue-ice-100: #cfe3fc;
-  --baby-blue-ice-200: #a0c8f8;
-  --baby-blue-ice-300: #70acf5;
-  --baby-blue-ice-400: #4090f2;
-  --baby-blue-ice-500: #1174ee;
-  --baby-blue-ice-600: #0d5dbf;
-  --baby-blue-ice-700: #0a468f;
-  --baby-blue-ice-800: #072f5f;
-  --baby-blue-ice-900: #031730;
-  --baby-blue-ice-950: #021021;
+  /* Paper — one warm-stone surface ramp, light to dark */
+  --paper-50: #fdfdfc;
+  --paper-100: #f7f6f4;
+  --paper-200: #e7e5e4;
+  --paper-300: #d6d3d1;
+  --paper-400: #b5b0ac;
 
-  /* Aquamarine Colors */
-  --aquamarine-50: #e9fbf4;
-  --aquamarine-100: #d4f7e9;
-  --aquamarine-200: #a8f0d3;
-  --aquamarine-300: #7de8bd;
-  --aquamarine-400: #52e0a7;
-  --aquamarine-500: #26d991;
-  --aquamarine-600: #1fad74;
-  --aquamarine-700: #178257;
-  --aquamarine-800: #0f573a;
-  --aquamarine-900: #082b1d;
-  --aquamarine-950: #051e14;
+  /* Ink — one neutral text ramp, light to dark */
+  --ink-400: #a8a29b;
+  --ink-500: #78716b;
+  --ink-600: #57514c;
+  --ink-700: #3a3632;
+  --ink-900: #16140f;
 
-  /* Rosy Taupe Colors */
-  --rosy-taupe-50: #f7efee;
-  --rosy-taupe-100: #efdedc;
-  --rosy-taupe-200: #dfbeb9;
-  --rosy-taupe-300: #cf9d96;
-  --rosy-taupe-400: #bf7c73;
-  --rosy-taupe-500: #af5b50;
-  --rosy-taupe-600: #8c4940;
-  --rosy-taupe-700: #693730;
-  --rosy-taupe-800: #462520;
-  --rosy-taupe-900: #231210;
-  --rosy-taupe-950: #180d0b;
+  /* Primary accent — neon green, used only on the live/active moment and the one primary action */
+  --accent-100: #d8fcc9;
+  --accent-300: #8df26a;
+  --accent-500: #37f712;
+  --accent-700: #1f8c0a;
+  --accent-900: #0b3203;
+  --accent-ink: #0b1a06; /* text set on top of an accent fill */
 
-  /* Blush Rose Colors */
-  --blush-rose-50: #fbe9ee;
-  --blush-rose-100: #f7d4de;
-  --blush-rose-200: #efa9bd;
-  --blush-rose-300: #e77e9c;
-  --blush-rose-400: #df537b;
-  --blush-rose-500: #d72859;
-  --blush-rose-600: #ac2048;
-  --blush-rose-700: #811836;
-  --blush-rose-800: #561024;
-  --blush-rose-900: #2b0812;
-  --blush-rose-950: #1e060d;
-
-  /* Vintage Berry Colors */
-  --vintage-berry-50: #faebf1;
-  --vintage-berry-100: #f5d6e4;
-  --vintage-berry-200: #ebadc9;
-  --vintage-berry-300: #e085ae;
-  --vintage-berry-400: #d65c93;
-  --vintage-berry-500: #cc3378;
-  --vintage-berry-600: #a32960;
-  --vintage-berry-700: #7a1f48;
-  --vintage-berry-800: #521430;
-  --vintage-berry-900: #290a18;
-  --vintage-berry-950: #1d0711;
-
-  /* Semantic Colors */
-  --primary: var(--baby-blue-ice-500);
-  --accent: var(--aquamarine-500);
-  --warm: var(--rosy-taupe-500);
-  --highlight: var(--blush-rose-500);
-  --secondary: var(--vintage-berry-500);
-
-  /* Neutral Gray Colors */
-  --gray-50: #f9fafb;
-  --gray-100: #f3f4f6;
-  --gray-200: #e5e7eb;
-  --gray-300: #d1d5db;
-  --gray-400: #9ca3af;
-  --gray-500: #6b7280;
-  --gray-600: #4b5563;
-  --gray-700: #374151;
-  --gray-800: #1f2937;
-  --gray-900: #111827;
+  /* Status — used only for status, never for chrome */
+  --success-100: #d6f0dc;
+  --success-600: #00a63d;
+  --success-700: #0c7a30;
+  --warning-100: #ffe9c2;
+  --warning-600: #fe9900;
+  --warning-700: #a86100;
+  --danger-100: #ffd7dd;
+  --danger-600: #ff2157;
+  --danger-700: #b3123a;
 }
 
 * {
@@ -92,41 +41,20 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
-    "Helvetica Neue", Arial, sans-serif;
+  font-family: "Space Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  background: var(--paper-100);
+  color: var(--ink-900);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
-    monospace;
+  font-family: "JetBrains Mono", source-code-pro, Menlo, Monaco, Consolas,
+    "Courier New", monospace;
 }
 
-/* Animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeInSlide {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
+/* Animations — feedback only, never decorative entrance motion */
 @keyframes bounce {
   0%,
   100% {
@@ -137,21 +65,13 @@ code {
   }
 }
 
-@keyframes ping {
-  75%,
-  100% {
-    transform: scale(2);
-    opacity: 0;
-  }
-}
-
 @keyframes pulse {
   0%,
   100% {
     opacity: 1;
   }
   50% {
-    opacity: 0.5;
+    opacity: 0.45;
   }
 }
 

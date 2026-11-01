@@ -1,12 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createLocalAudioTrack } from "livekit-client";
-import {
-  colors,
-  shadows,
-  borderRadius,
-  transitions,
-  gradients,
-} from "../utils/styles";
+import { colors, borderRadius, transitions, fonts } from "../utils/styles";
 import { useResponsive } from "../hooks/useResponsive";
 
 const VoiceInterface = ({
@@ -27,18 +21,6 @@ const VoiceInterface = ({
   const animationFrameRef = useRef(null);
   const audioContextRef = useRef(null);
   const { isMobile } = useResponsive();
-
-  // Get frequency-based color for each bar (returns CSS variable)
-  const getBarColor = (index) => {
-    const baseColors = [
-      colors.aquamarine[300], // Low frequencies - lighter
-      colors.aquamarine[400],
-      colors.aquamarine[500], // Mid frequencies - medium
-      colors.aquamarine[600],
-      colors["baby-blue-ice"][500], // High frequencies - different color
-    ];
-    return baseColors[index] || colors.aquamarine[500];
-  };
 
   // Analyze audio levels for equalizer visualization
   useEffect(() => {
@@ -246,29 +228,17 @@ const VoiceInterface = ({
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    padding: isMobile ? "1.5rem" : "2rem",
-    backgroundColor: "rgba(255, 255, 255, 0.8)",
-    backdropFilter: "blur(8px)",
-    borderRadius: borderRadius["2xl"],
-    boxShadow: shadows.lg,
+    padding: isMobile ? "1.25rem" : "1.5rem",
+    backgroundColor: colors.paper[50],
+    border: `1px solid ${colors.paper[300]}`,
+    borderRadius: borderRadius.md,
     width: "100%",
-    maxWidth: isMobile ? "100%" : "400px",
   };
 
   // Button container
   const buttonContainerStyle = {
     position: "relative",
-    marginBottom: "1rem",
-  };
-
-  // Pulsing ring style
-  const pulsingRingStyle = {
-    position: "absolute",
-    inset: 0,
-    borderRadius: "50%",
-    backgroundColor: colors.aquamarine[400], // CSS variable
-    animation: "ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite",
-    opacity: 0.75,
+    marginBottom: "0.75rem",
   };
 
   // Button base style
@@ -276,33 +246,32 @@ const VoiceInterface = ({
     const baseStyle = {
       position: "relative",
       zIndex: 10,
-      width: isMobile ? "64px" : "80px",
-      height: isMobile ? "64px" : "80px",
+      width: isMobile ? "56px" : "68px",
+      height: isMobile ? "56px" : "68px",
       borderRadius: "50%",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      border: "none",
+      border: `1px solid ${colors.paper[400]}`,
       cursor: isConnected ? "pointer" : "not-allowed",
-      transition: `all ${transitions.slow} ease-in-out`,
-      transform: "scale(1)",
+      transition: `background-color ${transitions.slow} ease-in-out, border-color ${transitions.slow} ease-in-out`,
       outline: "none",
-      boxShadow: shadows.lg,
     };
 
     if (micError) {
       return {
         ...baseStyle,
-        background: `linear-gradient(135deg, ${colors["rosy-taupe"][500]}, ${colors["rosy-taupe"][600]})`, // CSS variables
-        color: "white",
+        backgroundColor: colors.danger[600],
+        borderColor: colors.danger[700],
+        color: colors.paper[50],
       };
     }
 
     if (!isConnected) {
       return {
         ...baseStyle,
-        backgroundColor: colors.gray[300], // Using CSS variable
-        color: colors.gray[600], // Using CSS variable
+        backgroundColor: colors.paper[200],
+        color: colors.ink[500],
       };
     }
 
@@ -310,32 +279,32 @@ const VoiceInterface = ({
       if (isSpeaking) {
         return {
           ...baseStyle,
-          background: gradients.aquamarine, // Using centralized gradient
-          color: "white",
-          boxShadow: `${shadows.lg}, 0 0 20px rgba(38, 217, 145, 0.3)`, // Using rgba for opacity
+          backgroundColor: colors.accent[500],
+          borderColor: colors.accent[700],
+          color: colors.accent.ink,
         };
       } else if (isUserExpectedToSpeak && !isAgentSpeaking) {
-        // User should speak - add pulsing effect
         return {
           ...baseStyle,
-          background: gradients["baby-blue-ice"], // Using centralized gradient
-          color: "white",
-          boxShadow: `${shadows.lg}, 0 0 0 3px ${colors["baby-blue-ice"][300]}`,
+          backgroundColor: colors.accent[100],
+          borderColor: colors.accent[700],
+          color: colors.accent[900],
           animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
         };
       } else {
         return {
           ...baseStyle,
-          background: gradients["baby-blue-ice"], // Using centralized gradient
-          color: "white",
+          backgroundColor: colors.accent[300],
+          borderColor: colors.accent[700],
+          color: colors.accent.ink,
         };
       }
     }
 
     return {
       ...baseStyle,
-      backgroundColor: colors.gray[300], // Using CSS variable
-      color: colors.gray[600], // Using CSS variable
+      backgroundColor: colors.paper[200],
+      color: colors.ink[500],
     };
   };
 
@@ -344,61 +313,52 @@ const VoiceInterface = ({
     display: "flex",
     alignItems: "flex-end",
     justifyContent: "center",
-    gap: "0.25rem",
-    height: "48px",
-    marginBottom: "1rem",
+    gap: "3px",
+    height: "32px",
+    marginBottom: "0.75rem",
     width: "100%",
   };
 
-  // Equalizer bar style
-  const getBarStyle = (index, level) => {
+  // Equalizer bar style — one hue, intensity via opacity
+  const getBarStyle = (level) => {
     const height = Math.max(8, level);
-    const color = getBarColor(index); // CSS variable
-    const opacity = Math.min(1, level / 50 + 0.3);
+    const opacity = Math.min(1, level / 50 + 0.35);
 
     return {
-      width: isMobile ? "6px" : "8px",
+      width: isMobile ? "5px" : "6px",
       height: `${height}%`,
-      minHeight: "8px",
-      backgroundColor: color,
-      borderRadius: `${borderRadius.sm} ${borderRadius.sm} 0 0`,
-      transition: `height ${transitions.fast} ease-out, background-color ${transitions.fast} ease-out`,
+      minHeight: "6px",
+      backgroundColor: colors.accent[700],
       opacity,
-      boxShadow: level > 20 ? `0 2px 4px rgba(38, 217, 145, 0.25)` : "none", // Using rgba for opacity
+      transition: `height ${transitions.fast} ease-out, opacity ${transitions.fast} ease-out`,
     };
   };
 
   // Status text style
   const statusTextStyle = {
+    fontFamily: fonts.label,
     textAlign: "center",
-    fontSize: isMobile ? "0.875rem" : "0.9375rem",
-    fontWeight: 500,
+    fontSize: "0.8125rem",
   };
 
   return (
     <div style={containerStyle}>
       {/* Microphone Button with Voice Activity Indicator */}
       <div style={buttonContainerStyle}>
-        {/* Pulsing ring when speaking */}
-        {isSpeaking && isMicEnabled && (
-          <div style={pulsingRingStyle} aria-hidden="true" />
-        )}
-
-        {/* Main mic button */}
         <button
           onClick={toggleMic}
           disabled={!isConnected || isAgentSpeaking}
           style={getButtonStyle()}
           onMouseEnter={(e) => {
             if (isConnected && !micError) {
-              e.currentTarget.style.transform = "scale(1.1)";
+              e.currentTarget.style.borderColor = colors.ink[700];
             }
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "scale(1)";
+            e.currentTarget.style.borderColor = getButtonStyle().borderColor;
           }}
           onFocus={(e) => {
-            e.currentTarget.style.outline = `3px solid ${colors["baby-blue-ice"][300]}`;
+            e.currentTarget.style.outline = `2px solid ${colors.accent[700]}`;
             e.currentTarget.style.outlineOffset = "2px";
           }}
           onBlur={(e) => {
@@ -409,12 +369,13 @@ const VoiceInterface = ({
           aria-pressed={isMicEnabled}
         >
           <svg
-            width={isMobile ? "24" : "32"}
-            height={isMobile ? "24" : "32"}
+            width={isMobile ? "22" : "28"}
+            height={isMobile ? "22" : "28"}
             viewBox="0 0 24 24"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
             style={{ pointerEvents: "none" }}
+            aria-hidden="true"
           >
             {isMicEnabled ? (
               <path
@@ -438,11 +399,7 @@ const VoiceInterface = ({
           aria-label="Voice activity indicator"
         >
           {audioLevels.map((level, index) => (
-            <div
-              key={index}
-              style={getBarStyle(index, level)}
-              role="presentation"
-            />
+            <div key={index} style={getBarStyle(level)} role="presentation" />
           ))}
         </div>
       )}
@@ -450,43 +407,41 @@ const VoiceInterface = ({
       {/* Status Text */}
       <div style={statusTextStyle}>
         {micError ? (
-          <span style={{ color: colors["blush-rose"][600] }}>{micError}</span>
+          <span style={{ color: colors.danger[600] }}>{micError}</span>
         ) : isConnected ? (
           isAgentSpeaking ? (
-            <span style={{ color: colors["baby-blue-ice"][600] }}>
-              Agent is speaking...
-            </span>
+            <span style={{ color: colors.ink[600] }}>agent speaking…</span>
           ) : agentState === "thinking" ? (
-            <span style={{ color: colors["rosy-taupe"][600] }}>
-              Agent is thinking...
+            <span style={{ color: colors.warning[600] }}>
+              agent thinking…
             </span>
           ) : agentState === "ready_to_speak" ? (
-            <span style={{ color: colors["rosy-taupe"][600] }}>
-              Agent is preparing to speak...
+            <span style={{ color: colors.warning[600] }}>
+              agent preparing to speak…
             </span>
           ) : agentState === "processing" ? (
-            <span style={{ color: colors["rosy-taupe"][600] }}>
-              {agentStateMessage || "Processing..."}
+            <span style={{ color: colors.warning[600] }}>
+              {agentStateMessage || "processing…"}
             </span>
           ) : isUserExpectedToSpeak ? (
             <span
               style={{
-                color: colors["baby-blue-ice"][700],
+                color: colors.accent[700],
                 fontWeight: 600,
                 animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
               }}
             >
-              Please speak...
+              please speak…
             </span>
           ) : isMicEnabled ? (
-            <span style={{ color: colors.aquamarine[700] }}>
-              {isSpeaking ? "Listening..." : "Microphone enabled"}
+            <span style={{ color: colors.ink[600] }}>
+              {isSpeaking ? "listening…" : "microphone enabled"}
             </span>
           ) : (
-            <span style={{ color: colors.gray[600] }}>Microphone disabled</span>
+            <span style={{ color: colors.ink[500] }}>microphone disabled</span>
           )
         ) : (
-          <span style={{ color: colors.gray[500] }}>Not connected</span>
+          <span style={{ color: colors.ink[500] }}>not connected</span>
         )}
       </div>
     </div>

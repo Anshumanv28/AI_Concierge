@@ -4,13 +4,7 @@ import VoiceInterface from "./components/VoiceInterface";
 import Conversation from "./components/Conversation";
 import BookingConfirmation from "./components/BookingConfirmation";
 import CurrentSpeech from "./components/CurrentSpeech";
-import {
-  colors,
-  shadows,
-  borderRadius,
-  transitions,
-  gradients,
-} from "./utils/styles";
+import { colors, borderRadius, transitions, fonts } from "./utils/styles";
 import { useResponsive } from "./hooks/useResponsive";
 
 function App() {
@@ -44,207 +38,204 @@ function App() {
     await disconnect();
   };
 
-  // App container style
   const appContainerStyle = {
     minHeight: "100vh",
-    background: gradients["baby-blue-ice-light"],
+    background: colors.paper[100],
     display: "flex",
     flexDirection: "column",
   };
 
-  // Header style
   const headerStyle = {
-    backgroundColor: "rgba(255, 255, 255, 0.8)",
-    backdropFilter: "blur(8px)",
-    boxShadow: shadows.md,
+    backgroundColor: colors.paper[50],
+    borderBottom: `1px solid ${colors.paper[300]}`,
     position: "sticky",
     top: 0,
     zIndex: 50,
   };
 
   const headerContentStyle = {
-    maxWidth: "1280px",
+    maxWidth: "1152px",
     margin: "0 auto",
-    padding: isMobile ? "1rem" : isTablet ? "1rem 1.5rem" : "1rem 2rem",
+    padding: isMobile ? "0.75rem 1rem" : "0.75rem 1.5rem",
+    display: "flex",
+    alignItems: "baseline",
+    gap: "0.75rem",
+  };
+
+  const markStyle = {
+    fontFamily: fonts.display,
+    fontWeight: 700,
+    fontSize: isMobile ? "1.125rem" : "1.25rem",
+    color: colors.accent[700],
   };
 
   const titleStyle = {
-    fontSize: isMobile ? "1.5rem" : isTablet ? "2rem" : "2.25rem",
+    fontFamily: fonts.display,
+    fontSize: isMobile ? "1rem" : "1.125rem",
     fontWeight: 700,
-    background: gradients["text-gradient"],
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
-    backgroundClip: "text",
+    color: colors.ink[900],
     margin: 0,
   };
 
   const subtitleStyle = {
-    fontSize: isMobile ? "0.75rem" : "0.875rem",
-    color: colors["rosy-taupe"][700],
-    marginTop: "0.25rem",
+    fontFamily: fonts.label,
+    fontSize: "0.75rem",
+    color: colors.ink[500],
     margin: 0,
   };
 
-  // Main content style
   const mainStyle = {
-    maxWidth: "1280px",
+    maxWidth: "1152px",
     margin: "0 auto",
-    padding: isMobile ? "1rem" : isTablet ? "1.5rem" : "2rem",
+    padding: isMobile ? "1rem" : isTablet ? "1.25rem" : "1.5rem",
     width: "100%",
     flex: 1,
   };
 
-  // Connection section style
   const connectionSectionStyle = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    minHeight: "200px",
-    marginBottom: "2rem",
+    minHeight: "160px",
+    marginBottom: "1.5rem",
   };
 
-  // Connect button style
   const connectButtonStyle = {
-    padding: isMobile ? "0.75rem 1.5rem" : "1rem 2rem",
-    background: gradients["baby-blue-ice"],
-    color: "white",
-    fontWeight: 600,
-    borderRadius: borderRadius.xl,
-    boxShadow: shadows.lg,
-    border: "none",
-    cursor: "pointer",
-    fontSize: isMobile ? "0.875rem" : "1rem",
-    transition: `all ${transitions.normal} ease-in-out`,
-    outline: "none",
-  };
-
-  // Connecting spinner style
-  const connectingContainerStyle = {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "1rem",
-  };
-
-  const spinnerStyle = {
-    width: isMobile ? "2.5rem" : "3rem",
-    height: isMobile ? "2.5rem" : "3rem",
-    border: `4px solid ${colors["baby-blue-ice"][200]}`,
-    borderTop: `4px solid ${colors["baby-blue-ice"][500]}`,
-    borderRadius: "50%",
-    animation: "spin 1s linear infinite",
-  };
-
-  const connectingTextStyle = {
-    color: colors["baby-blue-ice"][700],
-    fontWeight: 500,
-    fontSize: isMobile ? "0.875rem" : "1rem",
-  };
-
-  // Connected status style
-  const connectedContainerStyle = {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "1rem",
-  };
-
-  const connectedStatusStyle = {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    color: colors.aquamarine[600],
-  };
-
-  const statusDotStyle = {
-    width: "12px",
-    height: "12px",
-    backgroundColor: colors.aquamarine[500],
-    borderRadius: "50%",
-    animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-  };
-
-  const statusTextStyle = {
-    fontWeight: 600,
-    fontSize: isMobile ? "0.875rem" : "1rem",
-  };
-
-  // Disconnect button style
-  const disconnectButtonStyle = {
-    padding: isMobile ? "0.5rem 1rem" : "0.625rem 1.25rem",
-    backgroundColor: colors["rosy-taupe"][500],
-    color: "white",
-    fontWeight: 500,
-    borderRadius: borderRadius.lg,
-    border: "none",
+    fontFamily: fonts.display,
+    padding: isMobile ? "0.625rem 1.25rem" : "0.75rem 1.5rem",
+    backgroundColor: colors.accent[500],
+    color: colors.accent.ink,
+    fontWeight: 700,
+    borderRadius: borderRadius.md,
+    border: `1px solid ${colors.accent[700]}`,
     cursor: "pointer",
     fontSize: isMobile ? "0.875rem" : "0.9375rem",
     transition: `background-color ${transitions.normal} ease-in-out`,
     outline: "none",
   };
 
-  // Error message style
+  const connectingContainerStyle = {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "0.75rem",
+  };
+
+  const spinnerStyle = {
+    width: "1.75rem",
+    height: "1.75rem",
+    border: `3px solid ${colors.paper[300]}`,
+    borderTop: `3px solid ${colors.accent[500]}`,
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
+  };
+
+  const connectingTextStyle = {
+    fontFamily: fonts.label,
+    color: colors.ink[600],
+    fontSize: "0.875rem",
+  };
+
+  const connectedContainerStyle = {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "0.75rem",
+  };
+
+  const connectedStatusStyle = {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+  };
+
+  const statusDotStyle = {
+    width: "8px",
+    height: "8px",
+    backgroundColor: colors.accent[500],
+    borderRadius: "50%",
+    animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+  };
+
+  const statusTextStyle = {
+    fontFamily: fonts.label,
+    color: colors.ink[700],
+    fontWeight: 600,
+    fontSize: "0.8125rem",
+    letterSpacing: "0.02em",
+  };
+
+  const disconnectButtonStyle = {
+    fontFamily: fonts.label,
+    padding: "0.4rem 0.875rem",
+    backgroundColor: "transparent",
+    color: colors.ink[700],
+    fontWeight: 600,
+    borderRadius: borderRadius.md,
+    border: `1px solid ${colors.paper[400]}`,
+    cursor: "pointer",
+    fontSize: "0.8125rem",
+    transition: `border-color ${transitions.normal} ease-in-out`,
+    outline: "none",
+  };
+
   const errorContainerStyle = {
-    marginTop: "1rem",
-    padding: "1rem",
-    backgroundColor: colors["blush-rose"][50],
-    border: `1px solid ${colors["blush-rose"][300]}`,
-    borderRadius: borderRadius.lg,
+    marginTop: "0.75rem",
+    padding: "0.75rem 1rem",
+    backgroundColor: colors.danger[100],
+    borderRadius: borderRadius.md,
     maxWidth: "28rem",
   };
 
   const errorTextStyle = {
-    color: colors["blush-rose"][700],
-    fontWeight: 500,
-    fontSize: isMobile ? "0.875rem" : "0.9375rem",
+    fontFamily: fonts.label,
+    color: colors.danger[700],
+    fontWeight: 600,
+    fontSize: "0.8125rem",
   };
 
-  // Grid layout style
   const gridLayoutStyle = {
     display: "grid",
-    gridTemplateColumns: isMobile || isTablet ? "1fr" : "1fr 2fr",
-    gap: isMobile ? "1rem" : "1.5rem",
+    gridTemplateColumns: isMobile || isTablet ? "1fr" : "360px 1fr",
+    gap: isMobile ? "1rem" : "1rem",
     width: "100%",
   };
 
-  // Right column style
   const rightColumnStyle = {
     display: "flex",
     flexDirection: "column",
-    gap: isMobile ? "1rem" : "1.5rem",
+    gap: "1rem",
   };
 
   return (
     <div style={appContainerStyle}>
-      {/* Header */}
       <header style={headerStyle}>
         <div style={headerContentStyle}>
-          <h1 style={titleStyle}>Restaurant Voice Booking Agent</h1>
-          <p style={subtitleStyle}>
-            Book your table through natural conversation
-          </p>
+          <span style={markStyle} aria-hidden="true">
+            {">_"}
+          </span>
+          <div>
+            <h1 style={titleStyle}>Restaurant Voice Booking Agent</h1>
+            <p style={subtitleStyle}>book a table by talking to it</p>
+          </div>
         </div>
       </header>
 
-      {/* Main Content */}
       <main style={mainStyle}>
-        {/* Connection Section */}
         <div style={connectionSectionStyle}>
           {!isConnected && !isConnecting && (
             <button
               onClick={handleConnect}
               style={connectButtonStyle}
               onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "scale(1.05)";
-                e.currentTarget.style.boxShadow = shadows.xl;
+                e.currentTarget.style.backgroundColor = colors.accent[300];
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
-                e.currentTarget.style.boxShadow = shadows.lg;
+                e.currentTarget.style.backgroundColor = colors.accent[500];
               }}
               onFocus={(e) => {
-                e.currentTarget.style.outline = `3px solid ${colors["baby-blue-ice"][300]}`;
+                e.currentTarget.style.outline = `2px solid ${colors.accent[700]}`;
                 e.currentTarget.style.outlineOffset = "2px";
               }}
               onBlur={(e) => {
@@ -252,14 +243,14 @@ function App() {
               }}
               aria-label="Connect to voice booking agent"
             >
-              Connect to Agent
+              connect_to_agent()
             </button>
           )}
 
           {isConnecting && (
             <div style={connectingContainerStyle}>
               <div style={spinnerStyle} aria-label="Connecting" />
-              <p style={connectingTextStyle}>Connecting to agent...</p>
+              <p style={connectingTextStyle}>connecting to agent…</p>
             </div>
           )}
 
@@ -267,21 +258,19 @@ function App() {
             <div style={connectedContainerStyle}>
               <div style={connectedStatusStyle}>
                 <div style={statusDotStyle} aria-hidden="true" />
-                <span style={statusTextStyle}>Connected</span>
+                <span style={statusTextStyle}>CONNECTED</span>
               </div>
               <button
                 onClick={handleDisconnect}
                 style={disconnectButtonStyle}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor =
-                    colors["rosy-taupe"][600];
+                  e.currentTarget.style.borderColor = colors.ink[700];
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor =
-                    colors["rosy-taupe"][500];
+                  e.currentTarget.style.borderColor = colors.paper[400];
                 }}
                 onFocus={(e) => {
-                  e.currentTarget.style.outline = `3px solid ${colors["rosy-taupe"][300]}`;
+                  e.currentTarget.style.outline = `2px solid ${colors.ink[700]}`;
                   e.currentTarget.style.outlineOffset = "2px";
                 }}
                 onBlur={(e) => {
@@ -289,22 +278,20 @@ function App() {
                 }}
                 aria-label="Disconnect from voice booking agent"
               >
-                Disconnect
+                disconnect()
               </button>
             </div>
           )}
 
           {error && (
             <div style={errorContainerStyle} role="alert">
-              <p style={errorTextStyle}>Error: {error}</p>
+              <p style={errorTextStyle}>error: {error}</p>
             </div>
           )}
         </div>
 
-        {/* Voice Interface and Conversation */}
         {isConnected && (
           <div style={gridLayoutStyle}>
-            {/* Voice Interface - Left Side */}
             <div>
               <VoiceInterface
                 room={room}
@@ -319,7 +306,6 @@ function App() {
               />
             </div>
 
-            {/* Conversation and Booking Confirmation - Right Side */}
             <div style={rightColumnStyle}>
               <Conversation
                 transcript={transcript}
@@ -339,7 +325,6 @@ function App() {
           </div>
         )}
 
-        {/* Current Speech Display */}
         <CurrentSpeech
           text={currentSpeech}
           isVisible={isConnected && currentSpeech}

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { colors, shadows, borderRadius, gradients } from "../utils/styles";
+import { colors, borderRadius, fonts } from "../utils/styles";
 import { useResponsive } from "../hooks/useResponsive";
 import OptionSelector from "./OptionSelector";
 
@@ -33,41 +33,37 @@ const Conversation = ({
     }
   };
 
-  // Container style
   const containerStyle = {
-    backgroundColor: "rgba(255, 255, 255, 0.8)",
-    backdropFilter: "blur(8px)",
-    borderRadius: borderRadius["2xl"],
-    boxShadow: shadows.lg,
-    padding: isMobile ? "1rem" : "1.5rem",
-    height: isMobile ? "400px" : isTablet ? "500px" : "600px",
+    backgroundColor: colors.paper[50],
+    border: `1px solid ${colors.paper[300]}`,
+    borderRadius: borderRadius.md,
+    padding: isMobile ? "0.875rem" : "1.125rem",
+    height: isMobile ? "400px" : isTablet ? "480px" : "560px",
     display: "flex",
     flexDirection: "column",
     width: "100%",
   };
 
-  // Header style
   const headerStyle = {
-    fontSize: isMobile ? "1.125rem" : "1.25rem",
-    fontWeight: 700,
-    color: colors["baby-blue-ice"][800],
-    marginBottom: "1rem",
+    fontFamily: fonts.label,
+    fontSize: "0.8125rem",
+    fontWeight: 600,
+    color: colors.ink[700],
+    marginBottom: "0.75rem",
     paddingBottom: "0.5rem",
-    borderBottom: `2px solid ${colors["baby-blue-ice"][200]}`,
+    borderBottom: `1px solid ${colors.paper[300]}`,
   };
 
-  // Messages container style
   const messagesContainerStyle = {
     flex: 1,
     overflowY: "auto",
     display: "flex",
     flexDirection: "column",
-    gap: "1rem",
-    paddingRight: "0.5rem",
-    marginBottom: isConnected ? "1rem" : "0",
+    gap: "0.75rem",
+    paddingRight: "0.25rem",
+    marginBottom: isConnected ? "0.75rem" : "0",
   };
 
-  // Empty state style
   const emptyStateStyle = {
     display: "flex",
     alignItems: "center",
@@ -76,34 +72,30 @@ const Conversation = ({
   };
 
   const emptyStateTextStyle = {
-    color: colors.gray[500],
+    fontFamily: fonts.label,
+    color: colors.ink[500],
     textAlign: "center",
-    fontStyle: "italic",
+    fontSize: "0.875rem",
   };
 
-  // Message bubble container
   const getMessageContainerStyle = (speaker) => ({
     display: "flex",
     justifyContent: speaker === "user" ? "flex-end" : "flex-start",
-    animation: "fadeInSlide 0.3s ease-out forwards",
   });
 
-  // Message bubble style
+  // Message bubble style — flat, one hue reserved for the user's own turn
   const getMessageBubbleStyle = (speaker) => {
     const isUser = speaker === "user";
     return {
-      maxWidth: isMobile ? "85%" : "75%",
-      borderRadius: borderRadius["2xl"],
-      padding: isMobile ? "0.75rem 1rem" : "0.875rem 1.25rem",
-      boxShadow: shadows.md,
-      background: isUser ? gradients["baby-blue-ice"] : gradients.aquamarine,
-      color: "white",
-      borderBottomRightRadius: isUser ? borderRadius.sm : borderRadius["2xl"],
-      borderBottomLeftRadius: isUser ? borderRadius["2xl"] : borderRadius.sm,
+      maxWidth: isMobile ? "88%" : "78%",
+      borderRadius: borderRadius.sm,
+      padding: isMobile ? "0.625rem 0.875rem" : "0.75rem 1rem",
+      backgroundColor: isUser ? colors.ink[900] : colors.paper[100],
+      border: isUser ? "none" : `1px solid ${colors.paper[300]}`,
+      color: isUser ? colors.paper[50] : colors.ink[900],
     };
   };
 
-  // Message header style
   const messageHeaderStyle = {
     display: "flex",
     alignItems: "center",
@@ -112,128 +104,106 @@ const Conversation = ({
   };
 
   const speakerNameStyle = {
-    fontSize: "0.75rem",
+    fontFamily: fonts.label,
+    fontSize: "0.6875rem",
     fontWeight: 600,
-    opacity: 0.9,
+    opacity: 0.75,
   };
 
   const timestampStyle = {
-    fontSize: "0.75rem",
-    opacity: 0.75,
+    fontFamily: fonts.label,
+    fontSize: "0.6875rem",
+    opacity: 0.6,
     marginLeft: "0.5rem",
   };
 
-  // Message text style
   const messageTextStyle = {
+    fontFamily: fonts.display,
     fontSize: isMobile ? "0.875rem" : "0.9375rem",
-    lineHeight: 1.6,
+    lineHeight: 1.55,
   };
 
-  // Typing indicator container
   const typingContainerStyle = {
     display: "flex",
     justifyContent: "flex-start",
-    animation: "fadeIn 0.3s ease-out forwards",
   };
 
-  // Typing indicator bubble
+  // Typing indicator bubble — agent states read as ink + the status hue, not a rainbow of fills
   const getTypingBubbleStyle = (state) => {
     const baseStyle = {
-      color: "white",
-      borderRadius: borderRadius["2xl"],
-      borderBottomLeftRadius: borderRadius.sm,
-      padding: isMobile ? "0.75rem 1rem" : "0.875rem 1.25rem",
-      boxShadow: shadows.md,
+      borderRadius: borderRadius.sm,
+      padding: isMobile ? "0.625rem 0.875rem" : "0.75rem 1rem",
+      border: `1px solid ${colors.paper[300]}`,
+      backgroundColor: colors.paper[100],
+      color: colors.ink[900],
     };
 
-    if (state === "thinking") {
+    if (state === "thinking" || state === "ready_to_speak" || state === "processing") {
       return {
         ...baseStyle,
-        background: gradients["rosy-taupe"],
-      };
-    } else if (state === "ready_to_speak") {
-      return {
-        ...baseStyle,
-        background: gradients["rosy-taupe"],
-        opacity: 0.9,
-      };
-    } else if (state === "processing") {
-      return {
-        ...baseStyle,
-        background: gradients["vintage-berry"],
-      };
-    } else {
-      return {
-        ...baseStyle,
-        background: gradients.aquamarine,
+        borderColor: colors.warning[600],
       };
     }
+    return baseStyle;
   };
 
-  // Typing dots container
   const typingDotsStyle = {
     display: "flex",
     gap: "0.25rem",
     alignItems: "center",
-    marginTop: "0.25rem",
+    marginTop: "0.375rem",
   };
 
-  // Typing dot style
-  const getTypingDotStyle = (delay) => ({
-    width: "8px",
-    height: "8px",
-    backgroundColor: "white",
+  const getTypingDotStyle = (delay, color) => ({
+    width: "6px",
+    height: "6px",
     borderRadius: "50%",
+    backgroundColor: color || colors.ink[500],
     animation: `bounce 0.6s infinite alternate`,
     animationDelay: `${delay}s`,
   });
 
-  // Input container style
   const inputContainerStyle = {
     display: "flex",
     gap: "0.5rem",
-    paddingTop: "1rem",
-    borderTop: `2px solid ${colors["baby-blue-ice"][200]}`,
+    paddingTop: "0.75rem",
+    borderTop: `1px solid ${colors.paper[300]}`,
     alignItems: "center",
   };
 
-  // Input style
   const inputStyle = {
+    fontFamily: fonts.display,
     flex: 1,
-    padding: isMobile ? "0.75rem" : "0.875rem 1rem",
-    borderRadius: borderRadius.lg,
-    border: `2px solid ${colors["baby-blue-ice"][300]}`,
+    padding: isMobile ? "0.625rem" : "0.6875rem 0.875rem",
+    borderRadius: borderRadius.sm,
+    border: `1px solid ${colors.paper[400]}`,
     fontSize: isMobile ? "0.875rem" : "0.9375rem",
-    outline: "none",
-    transition: "all 0.2s ease",
-    backgroundColor: "white",
-    color: colors.gray[800],
+    backgroundColor: colors.paper[50],
+    color: colors.ink[900],
   };
 
-  // Send button style
   const sendButtonStyle = {
-    padding: isMobile ? "0.75rem 1.25rem" : "0.875rem 1.5rem",
-    borderRadius: borderRadius.lg,
-    border: "none",
-    background: gradients["baby-blue-ice"],
-    color: "white",
-    fontSize: isMobile ? "0.875rem" : "0.9375rem",
-    fontWeight: 600,
+    fontFamily: fonts.label,
+    padding: isMobile ? "0.625rem 1rem" : "0.6875rem 1.125rem",
+    borderRadius: borderRadius.sm,
+    border: `1px solid ${colors.accent[700]}`,
+    backgroundColor: colors.accent[500],
+    color: colors.accent.ink,
+    fontSize: "0.8125rem",
+    fontWeight: 700,
     cursor: isConnected && inputValue.trim() ? "pointer" : "not-allowed",
-    opacity: isConnected && inputValue.trim() ? 1 : 0.6,
-    transition: "all 0.2s ease",
-    boxShadow: shadows.sm,
+    opacity: isConnected && inputValue.trim() ? 1 : 0.5,
   };
 
   return (
     <div style={containerStyle}>
-      <h3 style={headerStyle}>Conversation</h3>
+      <h3 style={headerStyle}>CONVERSATION</h3>
 
       <div style={messagesContainerStyle}>
         {transcript.length === 0 ? (
           <div style={emptyStateStyle}>
             <p style={emptyStateTextStyle}>
-              Start speaking to begin the conversation...
+              start speaking to begin the conversation…
             </p>
           </div>
         ) : (
@@ -243,7 +213,7 @@ const Conversation = ({
                 <div style={getMessageBubbleStyle(entry.speaker)}>
                   <div style={messageHeaderStyle}>
                     <span style={speakerNameStyle}>
-                      {entry.speaker === "user" ? "You" : "Agent"}
+                      {entry.speaker === "user" ? "YOU" : "AGENT"}
                     </span>
                     <span style={timestampStyle}>
                       {entry.timestamp
@@ -263,18 +233,27 @@ const Conversation = ({
             {isAgentTyping && agentState && (
               <div style={typingContainerStyle}>
                 <div style={getTypingBubbleStyle(agentState)}>
-                  <span style={speakerNameStyle}>Agent</span>
+                  <span style={speakerNameStyle}>AGENT</span>
                   <div style={messageTextStyle}>
-                    {agentState === "thinking" && "Agent is thinking..."}
+                    {agentState === "thinking" && "agent is thinking…"}
                     {agentState === "ready_to_speak" &&
-                      "Agent is preparing to speak..."}
+                      "agent is preparing to speak…"}
                     {agentState === "processing" &&
-                      (agentStateMessage || "Processing...")}
+                      (agentStateMessage || "processing…")}
                   </div>
                   <div style={typingDotsStyle}>
-                    <div style={getTypingDotStyle(0)} aria-hidden="true" />
-                    <div style={getTypingDotStyle(0.15)} aria-hidden="true" />
-                    <div style={getTypingDotStyle(0.3)} aria-hidden="true" />
+                    <div
+                      style={getTypingDotStyle(0, colors.warning[600])}
+                      aria-hidden="true"
+                    />
+                    <div
+                      style={getTypingDotStyle(0.15, colors.warning[600])}
+                      aria-hidden="true"
+                    />
+                    <div
+                      style={getTypingDotStyle(0.3, colors.warning[600])}
+                      aria-hidden="true"
+                    />
                   </div>
                 </div>
               </div>
@@ -285,49 +264,27 @@ const Conversation = ({
               <div style={typingContainerStyle}>
                 <div
                   style={{
-                    color: "white",
-                    borderRadius: borderRadius["2xl"],
-                    borderBottomLeftRadius: borderRadius.sm,
-                    padding: isMobile ? "0.75rem 1rem" : "0.875rem 1.25rem",
-                    boxShadow: shadows.md,
-                    background: gradients["baby-blue-ice"],
-                    border: `2px solid ${colors["baby-blue-ice"][400]}`,
+                    borderRadius: borderRadius.sm,
+                    padding: isMobile ? "0.625rem 0.875rem" : "0.75rem 1rem",
+                    backgroundColor: colors.accent[100],
+                    border: `1px solid ${colors.accent[700]}`,
+                    color: colors.accent[900],
                     animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
                   }}
                 >
-                  <span style={speakerNameStyle}>System</span>
-                  <div style={messageTextStyle}>Please speak...</div>
-                  <div
-                    style={{
-                      ...typingDotsStyle,
-                      marginTop: "0.5rem",
-                    }}
-                  >
+                  <span style={speakerNameStyle}>SYSTEM</span>
+                  <div style={messageTextStyle}>please speak…</div>
+                  <div style={typingDotsStyle}>
                     <div
-                      style={{
-                        ...getTypingDotStyle(0),
-                        backgroundColor: colors["baby-blue-ice"][600],
-                        width: "10px",
-                        height: "10px",
-                      }}
+                      style={getTypingDotStyle(0, colors.accent[700])}
                       aria-hidden="true"
                     />
                     <div
-                      style={{
-                        ...getTypingDotStyle(0.2),
-                        backgroundColor: colors["baby-blue-ice"][600],
-                        width: "10px",
-                        height: "10px",
-                      }}
+                      style={getTypingDotStyle(0.2, colors.accent[700])}
                       aria-hidden="true"
                     />
                     <div
-                      style={{
-                        ...getTypingDotStyle(0.4),
-                        backgroundColor: colors["baby-blue-ice"][600],
-                        width: "10px",
-                        height: "10px",
-                      }}
+                      style={getTypingDotStyle(0.4, colors.accent[700])}
                       aria-hidden="true"
                     />
                   </div>
@@ -365,18 +322,27 @@ const Conversation = ({
             }}
             placeholder={
               isAgentSpeaking
-                ? "Agent is speaking..."
-                : "Type your message here (or speak)..."
+                ? "agent is speaking…"
+                : "type your message here (or speak)…"
             }
             style={inputStyle}
             disabled={!isConnected || isAgentSpeaking}
+            aria-label="Message to the booking agent"
           />
           <button
             onClick={handleSendMessage}
             disabled={!isConnected || !inputValue.trim() || isAgentSpeaking}
             style={sendButtonStyle}
+            onMouseEnter={(e) => {
+              if (!e.currentTarget.disabled) {
+                e.currentTarget.style.backgroundColor = colors.accent[300];
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = colors.accent[500];
+            }}
           >
-            Send
+            SEND
           </button>
         </div>
       )}

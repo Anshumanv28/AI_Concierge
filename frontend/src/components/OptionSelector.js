@@ -1,11 +1,5 @@
 import React from "react";
-import {
-  colors,
-  shadows,
-  borderRadius,
-  gradients,
-  transitions,
-} from "../utils/styles";
+import { colors, borderRadius, transitions, fonts } from "../utils/styles";
 import { useResponsive } from "../hooks/useResponsive";
 
 const OptionSelector = ({ options, message, onSelect, isVisible }) => {
@@ -16,45 +10,38 @@ const OptionSelector = ({ options, message, onSelect, isVisible }) => {
     return null;
   }
 
-  // Container style
   const containerStyle = {
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-    backdropFilter: "blur(8px)",
-    borderRadius: borderRadius["2xl"],
-    boxShadow: shadows.lg,
-    padding: isMobile ? "1rem" : "1.5rem",
-    marginTop: "1rem",
-    animation: "fadeInSlide 0.3s ease-out forwards",
+    backgroundColor: colors.paper[50],
+    border: `1px solid ${colors.paper[300]}`,
+    borderRadius: borderRadius.md,
+    padding: isMobile ? "0.75rem" : "1rem",
+    marginTop: "0.75rem",
   };
 
-  // Message style
   const messageStyle = {
-    fontSize: isMobile ? "0.875rem" : "0.9375rem",
-    color: colors["baby-blue-ice"][700],
-    marginBottom: "1rem",
-    fontWeight: 500,
+    fontFamily: fonts.label,
+    fontSize: "0.8125rem",
+    color: colors.ink[600],
+    marginBottom: "0.75rem",
   };
 
-  // Options container style
   const optionsContainerStyle = {
     display: "flex",
     flexDirection: "column",
-    gap: "0.75rem",
+    gap: "0.5rem",
   };
 
-  // Option button style
   const getOptionButtonStyle = (isHovered) => ({
+    fontFamily: fonts.display,
     width: "100%",
-    padding: isMobile ? "0.75rem 1rem" : "0.875rem 1.25rem",
-    borderRadius: borderRadius.lg,
-    border: `2px solid ${colors["baby-blue-ice"][300]}`,
-    background: isHovered ? gradients["baby-blue-ice"] : "white",
-    color: isHovered ? "white" : colors["baby-blue-ice"][700],
+    padding: isMobile ? "0.625rem 0.875rem" : "0.6875rem 1rem",
+    borderRadius: borderRadius.sm,
+    border: `1px solid ${isHovered ? colors.accent[700] : colors.paper[400]}`,
+    backgroundColor: isHovered ? colors.accent[100] : colors.paper[50],
+    color: colors.ink[900],
     fontSize: isMobile ? "0.875rem" : "0.9375rem",
-    fontWeight: 500,
     cursor: "pointer",
-    transition: `all ${transitions.normal} ease-in-out`,
-    boxShadow: isHovered ? shadows.md : shadows.sm,
+    transition: `background-color ${transitions.normal} ease-in-out, border-color ${transitions.normal} ease-in-out, color ${transitions.normal} ease-in-out`,
     textAlign: "left",
     outline: "none",
   });
@@ -71,7 +58,7 @@ const OptionSelector = ({ options, message, onSelect, isVisible }) => {
             onMouseLeave={() => setHoveredIndex(null)}
             style={getOptionButtonStyle(hoveredIndex === index)}
             onFocus={(e) => {
-              e.currentTarget.style.outline = `3px solid ${colors["baby-blue-ice"][300]}`;
+              e.currentTarget.style.outline = `2px solid ${colors.accent[700]}`;
               e.currentTarget.style.outlineOffset = "2px";
             }}
             onBlur={(e) => {
