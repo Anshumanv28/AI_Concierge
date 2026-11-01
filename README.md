@@ -1,4 +1,4 @@
-# Restaurant Voice Booking Agent 🎙️
+# AI_Concierge – Restaurant Voice Booking Agent 🎙️
 
 [![CI/CD](https://github.com/Anshumanv28/AI_Concierge/actions/workflows/ci.yml/badge.svg)](https://github.com/Anshumanv28/AI_Concierge/actions/workflows/ci.yml)
 [![Node 18+](https://img.shields.io/badge/node-18%2B-339933.svg)](https://nodejs.org/)
