@@ -2,42 +2,62 @@
 
 [![CI/CD](https://github.com/Anshumanv28/AI_Concierge/actions/workflows/ci.yml/badge.svg)](https://github.com/Anshumanv28/AI_Concierge/actions/workflows/ci.yml)
 
-A full-stack MERN voice-enabled restaurant booking agent that allows customers to book tables through natural voice conversation. Built with LiveKit for voice interaction, OpenAI GPT for NLP, OpenWeatherMap for weather data, and NodeMailer for email confirmations.
+A voice-native AI agent that books restaurant tables through natural conversation — no forms, no menus, no rigid dialogue tree. A customer talks to it like a host; the LLM decides what to ask, when to check real data, and when to act.
 
-## Screenshots
+## Overview
+
+This is an **agentic system**, not a scripted chatbot: OpenAI GPT drives the entire conversation and decides for itself — turn by turn — which tool to call (check a date, check the weather, check availability, create the booking), based on function-calling tool definitions rather than a hand-coded state machine. An earlier state-machine implementation was deleted entirely once the LLM-driven flow replaced it.
+
+A few things it's designed to get right, which matter more than the voice gimmick:
+
+- **Grounded, not hallucinated.** When a requested time slot is taken, the backend computes real nearby open slots and hands them to the LLM as data — the model offers genuine alternatives instead of inventing plausible-sounding ones. Weather-based seating suggestions come from a live OpenWeatherMap call, not an LLM guess.
+- **Real-time voice pipeline.** Built on LiveKit Agents (STT → LLM tool-calling → TTS), with a typed-chat fallback path that drives the same `AgentSession` so the agent behaves identically whether the input is speech or text.
+- **Correctness under timezone/concurrency edge cases.** All date/time logic is explicitly anchored to IST regardless of host OS timezone (`backend/utils/timezone.js`), and booking-conflict checks are centralized in one shared module (`backend/utils/slotFinder.js`) used by every code path that needs them, closing a class of bugs where duplicated conflict logic drifted out of sync.
+- **Shipped, not just coded.** Three services (Node/Express API, Python/LiveKit agent, React frontend) are each Dockerized, wired together with Compose, and built/validated/pushed to GitHub Container Registry on every merge via GitHub Actions — see [CI/CD](#cicd).
+
+## Demo
 
 | Landing screen | Live voice session | Booking confirmation |
 | --- | --- | --- |
 | ![Landing screen](docs/screenshots/landing.jpg) | ![Connected voice session](docs/screenshots/connected.jpg) | ![Booking confirmation](docs/screenshots/booking-confirmation.jpg) |
 
-## Features
+## Architecture
 
-- 🎤 **Voice Interaction**: Natural conversation using LiveKit Agents Framework
-- 🤖 **AI-Powered**: OpenAI GPT for intelligent conversation handling
-- 🌤️ **Weather Integration**: Real-time weather data from OpenWeatherMap API
-- 📧 **Email Confirmations**: Automated booking confirmations via NodeMailer
-- 🗄️ **MongoDB Storage**: Persistent booking storage with duplicate prevention
-- ⚡ **Real-time**: Live voice conversation with instant responses
+```
+Frontend (React)  ──LiveKit room──▶  Agent (Python)
+     ▲                                    │
+     │                      function-call tools (check date,
+     │  data channel                      check weather,
+     │  (booking_confirmed,               check availability,
+     │   transcript, etc.)                create booking)
+     │                                    ▼
+     └────────────────────────── Backend (Node/Express) ──▶ MongoDB
+                                           │
+                                           ├──▶ OpenWeatherMap (live forecast)
+                                           └──▶ NodeMailer (restaurant + customer email)
+```
+
+The LLM (via the agent process) is the only thing deciding *what* happens next; the backend only executes well-defined tool calls and never makes conversational decisions itself.
 
 ## Tech Stack
 
 ### Backend
 
-- **Node.js** + **Express** - RESTful API
-- **MongoDB** + **Mongoose** - Database and ODM
-- **OpenWeatherMap API** - Weather forecast data
-- **NodeMailer** - Email service
+- **Node.js** + **Express** — RESTful API
+- **MongoDB** + **Mongoose** — Database and ODM
+- **OpenWeatherMap API** — Live weather forecast data
+- **NodeMailer** — Email service
 
 ### Agent (Python)
 
-- **LiveKit Agents Framework** - Voice agent infrastructure
-- **OpenAI GPT** - Natural language processing
-- **aiohttp** - Async HTTP client for backend API
+- **LiveKit Agents Framework** — Real-time voice pipeline + function-calling tool orchestration
+- **OpenAI GPT** — Drives the conversation and all tool-call decisions
+- **aiohttp** — Async HTTP client for the backend API
 
 ### Frontend
 
-- **React** - UI framework
-- **LiveKit Client SDK** - Voice interaction client
+- **React** — UI framework
+- **LiveKit Client SDK** — Voice interaction client
 
 ## Project Structure
 
@@ -60,7 +80,48 @@ restaurant-voice-agent/
 └── README.md
 ```
 
-## Prerequisites
+## Booking Flow
+
+1. User opens frontend and clicks "Connect to Agent"
+2. User speaks (or types): "I'd like to book a table"
+3. Agent collects: number of guests, preferred date and time, cuisine preference, special requests
+4. Agent calls the availability tool; if the slot is taken, the backend returns real nearby alternatives for the agent to offer
+5. Agent fetches live weather for the booking date and suggests indoor/outdoor seating accordingly
+6. Agent confirms all details with the user
+7. Agent calls the booking tool — booking is created with `status: "confirmed"` (auto-confirmed on success)
+8. Backend emails the restaurant, and the customer too if an email was captured
+9. Agent confirms booking success to the user
+
+## Key Implementation Details
+
+### Booking Schema
+
+- `bookingId`: MongoDB `_id` (auto-generated)
+- `customerName` / `customerEmail`: Captured from the conversation; falls back to "Guest"/no-email only if the customer declines
+- `bookingTime`: 24-hour format (HH:mm)
+- `bookingDate`: Date object, explicitly anchored to IST midnight (`backend/utils/timezone.js`)
+- `status`: `"confirmed"` on successful creation (auto-confirmed — no manual/restaurant approval step exists); `"cancelled"` via the cancel endpoint
+- `weatherInfo`: `{ condition, temperature, description }`
+
+### Conflict Handling
+
+- Exact date + time match check, centralized in `backend/utils/slotFinder.js`
+- On conflict, up to 3 real nearby open slots are computed and returned so the agent never has to guess
+
+### Email Confirmations
+
+- Sent to `RESTAURANT_EMAIL` always, and additionally to the customer if a valid email was captured during the conversation
+- Booking succeeds even if the email send fails — errors are logged, never block the booking
+
+### Weather Integration
+
+- Real API data (not LLM-generated)
+- No caching — fresh fetch for each booking
+- OpenWeatherMap 5-day forecast API
+
+## Getting Started
+
+### Prerequisites
 
 - **Node.js** 18+ and npm
 - **Python** 3.9+
@@ -69,8 +130,6 @@ restaurant-voice-agent/
 - **OpenAI API** key
 - **OpenWeatherMap API** key
 - **Gmail SMTP** credentials (for email)
-
-## Setup Instructions
 
 ### 1. Clone and Install Dependencies
 
@@ -196,9 +255,9 @@ REACT_APP_BACKEND_URL=http://localhost:5000
 
 **Note**: Create `.env` files in each directory (backend, agent, frontend) based on the `.env.example` files.
 
-## Running the Application
+### Running the Application
 
-### Start Backend
+#### Start Backend
 
 ```bash
 npm run backend:dev
@@ -208,7 +267,7 @@ cd backend && npm run dev
 
 Backend runs on `http://localhost:5000`
 
-### Start Agent (Python)
+#### Start Agent (Python)
 
 ```bash
 npm run agent
@@ -216,7 +275,7 @@ npm run agent
 cd agent && python agent.py dev
 ```
 
-### Start Frontend
+#### Start Frontend
 
 ```bash
 npm run frontend
@@ -226,7 +285,7 @@ cd frontend && npm start
 
 Frontend runs on `http://localhost:3000`
 
-### Run with Docker Compose
+#### Run with Docker Compose
 
 The whole stack (MongoDB + backend + agent + frontend) can also run in containers. You still need
 `backend/.env`, `agent/.env` and `frontend/.env` populated first (see above) — the images don't
@@ -265,51 +324,6 @@ Notes:
 
 - `POST /api/livekit/token` - Generate LiveKit access token for frontend (optional)
 
-## Booking Flow
-
-1. User opens frontend and clicks "Connect to Agent"
-2. User speaks: "I'd like to book a table"
-3. Agent collects:
-   - Number of guests
-   - Preferred date and time
-   - Cuisine preference
-   - Special requests
-4. Agent fetches weather for booking date
-5. Agent suggests indoor/outdoor seating based on weather
-6. Agent confirms all details
-7. Agent creates booking (status: "confirmed", auto-confirmed on success)
-8. Backend sends email confirmation to the restaurant, and to the customer if an email was provided
-9. Agent confirms booking success to user
-
-## Key Implementation Details
-
-### Booking Schema
-
-- `bookingId`: MongoDB `_id` (auto-generated)
-- `customerName`: Captured from the conversation; falls back to "Guest" if the customer doesn't provide one
-- `bookingTime`: 24-hour format (HH:mm)
-- `bookingDate`: Date object, explicitly anchored to IST midnight (`backend/utils/timezone.js`)
-- `status`: "confirmed" on successful creation (auto-confirmed - no manual/restaurant approval step exists); "cancelled" via the cancel endpoint
-- `weatherInfo`: `{ condition, temperature, description }`
-
-### Duplicate Prevention
-
-- Exact date + time match check
-- No time window checking
-- Error: "That exact time slot is already booked"
-
-### Email Confirmations
-
-- Sent to `RESTAURANT_EMAIL` (not customer)
-- Booking succeeds even if email fails
-- Email errors are logged but don't block booking
-
-### Weather Integration
-
-- Real API data (not LLM-generated)
-- No caching - fresh fetch for each booking
-- OpenWeatherMap 5-day forecast API
-
 ## Testing
 
 ### Manual Testing
@@ -317,7 +331,7 @@ Notes:
 1. Start all services (backend, agent, frontend)
 2. Open frontend in browser
 3. Click "Connect to Agent"
-4. Speak booking request
+4. Speak (or type) a booking request
 5. Complete conversation flow
 6. Verify booking in database
 7. Check email confirmation
@@ -340,6 +354,17 @@ curl -X POST http://localhost:5000/api/bookings \
   }'
 ```
 
+## CI/CD
+
+`.github/workflows/ci.yml` runs on every push and pull request to `main`:
+
+- **backend** / **frontend** / **agent** jobs install dependencies and validate each service builds
+  (the frontend job runs a full `react-scripts build`, which includes ESLint).
+- A **docker** job builds all three images (`backend/Dockerfile`, `agent/Dockerfile`,
+  `frontend/Dockerfile`) to confirm they're buildable, and on merges to `main` additionally pushes
+  them to GitHub Container Registry as `ghcr.io/<owner>/<repo>-{backend,agent,frontend}`, tagged
+  `latest` and with the commit SHA.
+
 ## Troubleshooting
 
 ### Backend Issues
@@ -360,28 +385,9 @@ curl -X POST http://localhost:5000/api/bookings \
 - **Microphone not working**: Grant browser microphone permissions
 - **No audio**: Check browser console for errors
 
-## Development Notes
-
-- All times are explicitly anchored to Asia/Kolkata (IST) via `backend/utils/timezone.js`, independent of the server's OS timezone
-- Customer name/email are captured from the conversation; "Guest"/no-email is only a fallback if the customer declines
-- Bookings are auto-confirmed on successful creation (status: "confirmed") - there's still no restaurant-approval step
-- Weather data fetched fresh for each booking (no caching)
-
-## CI/CD
-
-`.github/workflows/ci.yml` runs on every push and pull request to `main`:
-
-- **backend** / **frontend** / **agent** jobs install dependencies and validate each service builds
-  (the frontend job runs a full `react-scripts build`, which includes ESLint).
-- A **docker** job builds all three images (`backend/Dockerfile`, `agent/Dockerfile`,
-  `frontend/Dockerfile`) to confirm they're buildable, and on merges to `main` additionally pushes
-  them to GitHub Container Registry as `ghcr.io/<owner>/<repo>-{backend,agent,frontend}`, tagged
-  `latest` and with the commit SHA.
-
 ## Future Enhancements
 
 - Admin dashboard for booking management
-- Customer email collection and confirmations
 - SMS notifications via Twilio
 - Multi-language support
 - Calendar integration with time slot management
